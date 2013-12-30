@@ -14,3 +14,25 @@
 #   along with SzimatSzatyor.  If not, see <http://www.gnu.org/licenses/>.
 
 build/*
+*.exe
+*.dll
+*.lib
+*.obj
+*.pdb
+*.ilk
+
+*.sdf
+*.opensdf
+#*.sln
+*.suo
+#*.vcxproj*
+*.vcxproj.user
+*.vcxproj.filters
+
+*.tlog
+*.log
+
+*.pkt
+*.bin
+*.rar
+*.7z

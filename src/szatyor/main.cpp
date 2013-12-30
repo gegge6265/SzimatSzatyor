@@ -159,10 +159,7 @@ int main(int argc, char* argv[])
             processID = *itr;
 
             // if already injected
-            if (std::find(injectedPIDs.begin(),
-                          injectedPIDs.end(),
-                          processID)
-                                     != injectedPIDs.end())
+            if (std::find(injectedPIDs.begin(), injectedPIDs.end(), processID) != injectedPIDs.end())
             {
                 printf("This process is already injected. ");
                 printf("Please choose a different one.\n");
@@ -207,7 +204,7 @@ int main(int argc, char* argv[])
 
     delete [] dllPath;
 
-    system("pause");
+    //system("pause");
     return 0;
 }
 
@@ -259,8 +256,7 @@ bool IsProcessAlreadyInjected(DWORD PID, const char* moduleName)
         DWORD bytesReq = 0;
         if (!EnumProcessModules(clientProcess, modules, sizeof(modules), &bytesReq))
         {
-            printf("Can't get process' modules. ErrorCode: %u\n",
-                   GetLastError());
+            printf("Can't get process' modules. ErrorCode: %u\n", GetLastError());
             CloseHandle(clientProcess);
             return false;
         }

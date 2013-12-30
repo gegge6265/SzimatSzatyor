@@ -27,11 +27,7 @@
 // it will jump relatively forward (or backward if minus) in the code
 // by the value of the displacement and on that address there is our function
 // JMP <displacement>
-BYTE jumpMachineCode[JMP_INSTRUCTION_SIZE] = { 0xE9,
-                                               0x00,
-                                               0x00,
-                                               0x00,
-                                               0x00 };
+BYTE jumpMachineCode[JMP_INSTRUCTION_SIZE] = { 0xE9, 0x00, 0x00, 0x00, 0x00 };
 
 // functions which can hook/unhook functions
 class HookManager

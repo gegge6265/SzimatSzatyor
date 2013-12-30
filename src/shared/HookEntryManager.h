@@ -16,10 +16,18 @@
  */
 
 #pragma once
-
 #include <wtypes.h>
-
 #include <map>
+
+#define PKT_VERSION     0x0301
+#define SNIFFER_ID      15
+// todo: use it
+#define CLIENT_BUILD    17688
+#define SEND2           0x3988D7
+#define PROCESS_MESSAGE 0x3965BB
+#define CLEINET_LOCALE  0xE7080C
+
+#define FILL_OFFSET(build, send2, processMessage, locale) _hookEntryMap[(build)] = HookEntry((send2), (processMessage), (locale))
 
 // list of supported client build numbers
 #define WOW_CLASS_5875  5875
@@ -64,18 +72,22 @@ public:
         {
             send2_AddressOffset = 0;
             processMessage_AddressOffset = 0;
+            locale_AddressOffset = 0;
         }
         // constructor
-        HookEntry(DWORD send2, DWORD processMessage)
+        HookEntry(DWORD send2, DWORD processMessage, DWORD locale)
         {
             send2_AddressOffset = send2;
             processMessage_AddressOffset = processMessage;
+            locale_AddressOffset = locale;
         }
 
         // offset of NetClient::Send2 to sniff client packets
         DWORD send2_AddressOffset;
         // offset of NetClient::ProcessMessage to sniff server packets
         DWORD processMessage_AddressOffset;
+        // offset of client locale "xxXX"
+        DWORD locale_AddressOffset;
     };
 
     // returns the build number of the client
@@ -96,31 +108,36 @@ public:
     // this is some kind of initialization of the class
     static void FillHookEntries()
     {
-        FillHookEntry5875();
-        FillHookEntry8606();
-        FillHookEntry12340();
-        FillHookEntry13623();
-        FillHookEntry15595();
-        FillHookEntry16135();
-        FillHookEntry16357();
-        FillHookEntry16650();
-        FillHookEntry16709();
-        FillHookEntry16826();
-        FillHookEntry16981();
-        FillHookEntry16983();
-        FillHookEntry16992();
-        FillHookEntry17055();
-        FillHookEntry17056();
-        FillHookEntry17093();
-        FillHookEntry17116();
-        FillHookEntry17124();
-        FillHookEntry17128();
-        FillHookEntry17359();
-        FillHookEntry17371();
-        FillHookEntry17399();
-        FillHookEntry17538();
-        FillHookEntry17658();
-        FillHookEntry17688();
+        //             build          send2     pm     locale
+        FILL_OFFSET(WOW_CLASS_5875, 0x1B5630, 0x137AA0, 0);
+
+        FILL_OFFSET(WOW_TBC_8606,   0x0203B0, 0x15F440, 0);
+
+        FILL_OFFSET(WOW_WLK_12340,  0x0675F0, 0x231FE0, 0);
+
+        FILL_OFFSET(WOW_CATA_13623, 0x15EF20, 0x090360, 0);
+        FILL_OFFSET(WOW_CATA_15595, 0x089590, 0x0873D0, 0);
+
+        FILL_OFFSET(WOW_MOP_16135,  0x3F9AE0, 0x3F7710, 0);
+        FILL_OFFSET(WOW_MOP_16357,  0x40C5D0, 0x40A210, 0);
+        FILL_OFFSET(WOW_MOP_16650,  0x448D10, 0x446720, 0);
+        FILL_OFFSET(WOW_MOP_16709,  0x448FB0, 0x446A00, 0);
+        FILL_OFFSET(WOW_MOP_16826,  0x448E40, 0x446880, 0);
+        FILL_OFFSET(WOW_MOP_16981,  0x363B57, 0x361C6D, 0);
+        FILL_OFFSET(WOW_MOP_16983,  0x36400D, 0x362123, 0);
+        FILL_OFFSET(WOW_MOP_16992,  0x36424A, 0x362360, 0);
+        FILL_OFFSET(WOW_MOP_17055,  0x363F76, 0x36206E, 0);
+        FILL_OFFSET(WOW_MOP_17056,  0x3E43D9, 0x3E1ECC, 0);
+        FILL_OFFSET(WOW_MOP_17093,  0x3EED60, 0x3EC853, 0);
+        FILL_OFFSET(WOW_MOP_17116,  0x364654, 0x36276A, 0);
+        FILL_OFFSET(WOW_MOP_17124,  0x3F3B0F, 0x3F1490, 0);
+        FILL_OFFSET(WOW_MOP_17128,  0x363C88, 0x361D9B, 0);
+        FILL_OFFSET(WOW_MOP_17359,  0x391942, 0x38F9C5, 0);
+        FILL_OFFSET(WOW_MOP_17371,  0x39192A, 0x38F9AD, 0);
+        FILL_OFFSET(WOW_MOP_17399,  0x39199E, 0x38FA21, 0);
+        FILL_OFFSET(WOW_MOP_17538,  0x38F1A9, 0x38D225, 0);
+        FILL_OFFSET(WOW_MOP_17658,  0x3988D7, 0x3965BB, 0xE7080C);
+        FILL_OFFSET(WOW_MOP_17688,  0x3988D7, 0x3965BB, 0xE7080C);
     }
 
     // returns true if hook entry exists for this specified build number
@@ -133,182 +150,6 @@ public:
     static HookEntry const& GetHookEntry(WORD buildNumber)
     {
         return _hookEntryMap[buildNumber];
-    }
-
-private:
-    // address offsets for CLASSIC, 5875
-    static void FillHookEntry5875()
-    {
-        HookEntry hookEntry5875 = HookEntry(0x1B5630, 0x137AA0);
-        _hookEntryMap[WOW_CLASS_5875] = hookEntry5875;
-    }
-
-    // address offsets for TBC, 8606
-    static void FillHookEntry8606()
-    {
-        HookEntry hookEntry8606 = HookEntry(0x203B0, 0x15F440);
-        _hookEntryMap[WOW_TBC_8606] = hookEntry8606;
-    }
-
-    // address offsets for WLK, 12340
-    static void FillHookEntry12340()
-    {
-        HookEntry hookEntry12340 = HookEntry(0x675F0, 0x231FE0);
-        _hookEntryMap[WOW_WLK_12340] = hookEntry12340;
-    }
-
-    // address offsets for CATA, 13623
-    static void FillHookEntry13623()
-    {
-        HookEntry hookEntry13623 = HookEntry(0x15EF20, 0x90360);
-        _hookEntryMap[WOW_CATA_13623] = hookEntry13623;
-    }
-
-    // address offsets for CATA, 15595
-    static void FillHookEntry15595()
-    {
-        HookEntry hookEntry16357 = HookEntry(0x89590, 0x873D0);
-        _hookEntryMap[WOW_CATA_15595] = hookEntry16357;
-    }
-
-    // address offsets for MOP, 16135
-    static void FillHookEntry16135()
-    {
-        HookEntry hookEntry16135 = HookEntry(0x3F9AE0, 0x3F7710);
-        _hookEntryMap[WOW_MOP_16135] = hookEntry16135;
-    }
-
-    // address offsets for MOP, 16357
-    static void FillHookEntry16357()
-    {
-        HookEntry hookEntry16357 = HookEntry(0x40C5D0, 0x40A210);
-        _hookEntryMap[WOW_MOP_16357] = hookEntry16357;
-    }
-
-    // address offsets for MOP, 16650
-    static void FillHookEntry16650()
-    {
-        HookEntry hookEntry166550 = HookEntry(0x448D10, 0x446720);
-        _hookEntryMap[WOW_MOP_16650] = hookEntry166550;
-    }
-
-    // address offsets for MOP, 16709
-    static void FillHookEntry16709()
-    {
-        HookEntry hookEntry16709 = HookEntry(0x448FB0, 0x446A00);
-        _hookEntryMap[WOW_MOP_16709] = hookEntry16709;
-    }
-
-    // address offsets for MOP, 16826
-    static void FillHookEntry16826()
-    {
-        HookEntry hookEntry16826 = HookEntry(0x448E40, 0x446880);
-        _hookEntryMap[WOW_MOP_16826] = hookEntry16826;
-    }
-
-    // address offsets for MOP, 16981
-    static void FillHookEntry16981()
-    {
-        HookEntry hookEntry16981 = HookEntry(0x363B57, 0x361C6D);
-        _hookEntryMap[WOW_MOP_16981] = hookEntry16981;
-    }
-
-    // address offsets for MOP, 16983
-    static void FillHookEntry16983()
-    {
-        HookEntry hookEntry16983 = HookEntry(0x36400D, 0x362123);
-        _hookEntryMap[WOW_MOP_16983] = hookEntry16983;
-    }
-
-    // address offsets for MOP, 16992
-    static void FillHookEntry16992()
-    {
-        HookEntry hookEntry16992 = HookEntry(0x36424A, 0x362360);
-        _hookEntryMap[WOW_MOP_16992] = hookEntry16992;
-    }
-
-    // address offsets for MOP, 17055
-    static void FillHookEntry17055()
-    {
-        HookEntry hookEntry17055 = HookEntry(0x363F76, 0x36206E);
-        _hookEntryMap[WOW_MOP_17055] = hookEntry17055;
-    }
-
-    // address offsets for MOP, 17056
-    static void FillHookEntry17056()
-    {
-        HookEntry hookEntry17056 = HookEntry(0x3E43D9, 0x3E1ECC);
-        _hookEntryMap[WOW_MOP_17056] = hookEntry17056;
-    }
-
-    // address offsets for MOP, 17093
-    static void FillHookEntry17093()
-    {
-        HookEntry hookEntry17093 = HookEntry(0x3EED60, 0x3EC853);
-        _hookEntryMap[WOW_MOP_17093] = hookEntry17093;
-    }
-
-    // address offsets for MOP, 17116
-    static void FillHookEntry17116()
-    {
-        HookEntry hookEntry17116 = HookEntry(0x364654, 0x36276A);
-        _hookEntryMap[WOW_MOP_17116] = hookEntry17116;
-    }
-
-    // address offsets for MOP, 17124
-    static void FillHookEntry17124()
-    {
-        HookEntry hookEntry17124 = HookEntry(0x3F3B0F, 0x3F1490);
-        _hookEntryMap[WOW_MOP_17124] = hookEntry17124;
-    }
-
-    // address offsets for MOP, 17128
-    static void FillHookEntry17128()
-    {
-        HookEntry hookEntry17128 = HookEntry(0x363C88, 0x361D9B);
-        _hookEntryMap[WOW_MOP_17128] = hookEntry17128;
-    }
-
-    // address offsets for MOP, 17359
-    static void FillHookEntry17359()
-    {
-        HookEntry hookEntry17359 = HookEntry(0x391942, 0x38F9C5);
-        _hookEntryMap[WOW_MOP_17359] = hookEntry17359;
-    }
-
-    // address offsets for MOP, 17371
-    static void FillHookEntry17371()
-    {
-        HookEntry hookEntry17371 = HookEntry(0x39192A, 0x38F9AD);
-        _hookEntryMap[WOW_MOP_17371] = hookEntry17371;
-    }
-
-    // address offsets for MOP, 17399
-    static void FillHookEntry17399()
-    {
-        HookEntry hookEntry17399 = HookEntry(0x39199E, 0x38FA21);
-        _hookEntryMap[WOW_MOP_17399] = hookEntry17399;
-    }
-
-    // address offsets for MOP, 17538
-    static void FillHookEntry17538()
-    {
-        HookEntry hookEntry17538 = HookEntry(0x38F1A9, 0x38D225);
-        _hookEntryMap[WOW_MOP_17538] = hookEntry17538;
-    }
-
-    // address offsets for MOP, 17658
-    static void FillHookEntry17658()
-    {
-        HookEntry hookEntry17658 = HookEntry(0x3988D7, 0x3965BB);
-        _hookEntryMap[WOW_MOP_17658] = hookEntry17658;
-    }
-
-    // address offsets for MOP, 17688
-    static void FillHookEntry17688()
-    {
-        HookEntry hookEntry17688 = HookEntry(0x3988D7, 0x3965BB);
-        _hookEntryMap[WOW_MOP_17688] = hookEntry17688;
     }
 
     // type for storing hook entries

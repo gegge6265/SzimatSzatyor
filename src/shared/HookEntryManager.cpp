@@ -16,7 +16,6 @@
  */
 
 #include "HookEntryManager.h"
-
 #include <psapi.h>
 
 // static member initilization

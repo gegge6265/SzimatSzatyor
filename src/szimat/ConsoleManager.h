@@ -33,24 +33,19 @@ public:
         HWND consoleWindowHandler = GetConsoleWindow();
         // disables the "close button" on the console
         // console shutdown should work via SIGINT
-        EnableMenuItem(GetSystemMenu(consoleWindowHandler, FALSE),
-                       SC_CLOSE,
-                       MF_GRAYED);
+        EnableMenuItem(GetSystemMenu(consoleWindowHandler, FALSE), SC_CLOSE, MF_GRAYED);
         // just be sure to display the grayed (and disabled) close button
         DrawMenuBar(consoleWindowHandler); // re-draw
 
         // registers a handler which handles SIGINT (CTRL-C) signal
         // basically the handler routine will be called when
         // CTRL-C (exit) will be pressed
-        if (!SetConsoleCtrlHandler((PHANDLER_ROUTINE)
-                                    ConsoleManager::SignalHandler_SIGINT,
-                                   TRUE))
+        if (!SetConsoleCtrlHandler((PHANDLER_ROUTINE)ConsoleManager::SignalHandler_SIGINT, TRUE))
             return false;
 
         // just be sure there's a STDOUT
         HANDLE standardOutputHandler = GetStdHandle(STD_OUTPUT_HANDLE);
-        if (!standardOutputHandler ||
-            standardOutputHandler == INVALID_HANDLE_VALUE)
+        if (!standardOutputHandler || standardOutputHandler == INVALID_HANDLE_VALUE)
             return false;
 
         // nice title again :)
