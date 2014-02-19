@@ -55,6 +55,7 @@
 #define WOW_MOP_17538   17538
 #define WOW_MOP_17658   17658
 #define WOW_MOP_17688   17688
+#define WOW_MOP_17898   17898
 
 // stores and manages hook entries
 // this will be compiled into a static lib
@@ -138,6 +139,7 @@ public:
         FILL_OFFSET(WOW_MOP_17538,  0x38F1A9, 0x38D225, 0);
         FILL_OFFSET(WOW_MOP_17658,  0x3988D7, 0x3965BB, 0xE7080C);
         FILL_OFFSET(WOW_MOP_17688,  0x3988D7, 0x3965BB, 0xE7080C);
+        FILL_OFFSET(WOW_MOP_17898,  0x399BB8, 0x397A00, 0xE73344);
     }
 
     // returns true if hook entry exists for this specified build number
