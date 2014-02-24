@@ -140,6 +140,7 @@ public:
         FILL_OFFSET(WOW_MOP_17658,  0x3988D7, 0x3965BB, 0xE7080C);
         FILL_OFFSET(WOW_MOP_17688,  0x3988D7, 0x3965BB, 0xE7080C);
         FILL_OFFSET(WOW_MOP_17898,  0x399BB8, 0x397A00, 0xE73344);
+        FILL_OFFSET(17930, 0x39A93E, 0x398786, 0xE75344);
     }
 
     // returns true if hook entry exists for this specified build number
