@@ -48,10 +48,7 @@ char locale[5] = { 'x', 'x', 'X', 'X', '\0' };
 // fastcall convention means that the first 2 parameters is passed
 // via ECX and EDX registers so the first param will be the this pointer and
 // the second one is just a dummy (not used)
-DWORD __fastcall SendHook(void* thisPTR,
-                          void* /* dummy */,
-                          void* /* param1 */,
-                          void* /* param2 */);
+DWORD __fastcall SendHook(void* thisPTR, void* /* dummy */, CDataStore* /* dataStore */, void* /* param2 */);
 // this send prototype fits with the client's one
 typedef DWORD (__thiscall *SendProto)(void*, void*, void*);
 
@@ -65,11 +62,7 @@ BYTE machineCodeHookSend[JMP_INSTRUCTION_SIZE] = { 0 };
 BYTE defaultMachineCodeSend[JMP_INSTRUCTION_SIZE] = { 0 };
 
 // this function will be called when recv called in the client
-DWORD __fastcall RecvHook(void* thisPTR,
-                          void* /* dummy */,
-                          void* /* param1 */,
-                          void* /* param2 */,
-                          void* /* param3 */);
+DWORD __fastcall RecvHook(void* thisPTR, void* /* dummy */, void* /* param1 */, CDataStore* /* dataStore */, void* /* param3 */);
 // this recv prototype fits with the client's one
 typedef DWORD (__thiscall *RecvProto)(void*, void*, void*, void*);
 // clients which has build number <= 8606 have different prototype
@@ -211,7 +204,7 @@ DWORD MainThreadControl(LPVOID /* param */)
     return 0;
 }
 
-static void DumpPacket(DWORD packetType, DWORD connectionId, DWORD packetOpcode, DWORD packetSize, DWORD buffer, const WORD initialReadOffset)
+static void DumpPacket(DWORD packetType, DWORD connectionId, WORD opcodeSize, CDataStore* dataStore)
 {
     // gets the time
     time_t rawTime;
@@ -262,7 +255,13 @@ static void DumpPacket(DWORD packetType, DWORD connectionId, DWORD packetOpcode,
         fflush(fileDump);
     }
 
-    DWORD fullSize = packetSize + initialReadOffset;
+    DWORD packetOpcode = opcodeSize == 4
+        ? *(DWORD*)dataStore->buffer
+        : *( WORD*)dataStore->buffer;
+
+    BYTE* packetData     = dataStore->buffer + opcodeSize;
+    DWORD packetDataSize = dataStore->size   - opcodeSize;
+    DWORD fullSize       = packetDataSize    + opcodeSize;
 
     fwrite((DWORD*)&packetType,           4, 1, fileDump);  // direction of the packet
     fwrite((DWORD*)&connectionId,         4, 1, fileDump);  // connection id
@@ -271,31 +270,26 @@ static void DumpPacket(DWORD packetType, DWORD connectionId, DWORD packetOpcode,
     fwrite((DWORD*)&fullSize,             4, 1, fileDump);  // size of the packet + opcode lenght
     fwrite((DWORD*)&packetOpcode,         4, 1, fileDump);  // opcode
 
-    fwrite((BYTE*)(buffer + initialReadOffset), packetSize, 1, fileDump); // data
+    fwrite(packetData, packetDataSize, 1, fileDump); // data
+
+#if _DEBUG
+    printf("%s Opcode: %-8u Size: %-8u\n", packetType == CMSG ? "CMSG" : "SMSG", packetOpcode, packetDataSize);
+#endif
 
     fflush(fileDump);
 }
 
-DWORD __fastcall SendHook(void* thisPTR, void* /* dummy */, void* param1, void* param2)
+DWORD __fastcall SendHook(void* thisPTR, void* /* dummy */, CDataStore* dataStore, void* param2)
 {
-    WORD packetOpcodeSize = 4; // 4 bytes for all versions
-
-    DWORD buffer       = *(DWORD*)((DWORD)param1 + 4);
-    DWORD packetOpcode = *(DWORD*)buffer;               // packetOpcodeSize
-    DWORD packetSize   = *(DWORD*)((DWORD)param1 + 16); // totalLength, writePos
-
-#if _DEBUG
-    printf("CMSG Opcode: %u, Size: %u, param2: %u\n", packetOpcode, packetSize, param2);
-#endif
-
     // dumps the packet
-    DumpPacket(CMSG, 0, packetOpcode, packetSize - packetOpcodeSize, buffer, packetOpcodeSize);
+    DumpPacket(CMSG, 0, 4, dataStore);
+
     // unhooks the send function
     HookManager::UnHook(sendAddress, defaultMachineCodeSend);
 
     // now let's call client's function
     // so it can send the packet to the server (connection, CDataStore*, 2)
-    DWORD returnValue = SendProto(sendAddress)(thisPTR, param1, param2);
+    DWORD returnValue = SendProto(sendAddress)(thisPTR, dataStore, param2);
 
     // hooks again to catch the next outgoing packets also
     HookManager::ReHook(sendAddress, machineCodeHookSend);
@@ -309,22 +303,11 @@ DWORD __fastcall SendHook(void* thisPTR, void* /* dummy */, void* param1, void* 
     return 0;
 }
 
-DWORD __fastcall RecvHook(void* thisPTR, void* /* dummy */, void* param1, void* param2, void* param3)
+DWORD __fastcall RecvHook(void* thisPTR, void* /* dummy */, void* param1, CDataStore* dataStore, void* param3)
 {
-    // 2 bytes before MOP, 4 bytes after MOP
-    WORD packetOpcodeSize = buildNumber <= WOW_MOP_16135 ? 2 : 4; 
-
-    DWORD buffer       = *(DWORD*)((DWORD)param2 + 4);
-    DWORD packetOpcode = packetOpcodeSize == 2 ? *(WORD*) buffer  // 2 bytes
-                                               : *(DWORD*)buffer; // or 4 bytes
-    DWORD packetSize   = *(DWORD*)((DWORD)param2 + 16);           // totalLength, writePos
-
-#if _DEBUG
-    printf("SMSG Opcode: %u, Size: %u, param1: %u, param3: %u\n", packetOpcode, packetSize, param1, param3);
-#endif
-
+    WORD opcodeSize = buildNumber <= WOW_MOP_16135 ? 2 : 4;
     // packet dump
-    DumpPacket(SMSG, 0, packetOpcode, packetSize - packetOpcodeSize, buffer, packetOpcodeSize);
+    DumpPacket(SMSG, 0, opcodeSize, dataStore);
 
     // unhooks the recv function
     HookManager::UnHook(recvAddress, defaultMachineCodeRecv);
@@ -332,9 +315,9 @@ DWORD __fastcall RecvHook(void* thisPTR, void* /* dummy */, void* param1, void* 
     // calls client's function so it can processes the packet
     DWORD returnValue = 0;
     if (buildNumber <= WOW_TBC_8606) // different prototype
-        returnValue = RecvProto8606(recvAddress)(thisPTR, param1, param2);
+        returnValue = RecvProto8606(recvAddress)(thisPTR, param1, dataStore);
     else
-        returnValue = RecvProto(recvAddress)(thisPTR, param1, param2, param3);
+        returnValue = RecvProto(recvAddress)(thisPTR, param1, dataStore, param3);
 
     // hooks again to catch the next incoming packets also
     HookManager::ReHook(recvAddress, machineCodeHookRecv);

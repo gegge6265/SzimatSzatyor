@@ -25,6 +25,15 @@
 #define WOW_TBC_8606  8606
 #define WOW_MOP_16135 16135
 
+typedef struct {
+    void* vTable;
+    BYTE* buffer;
+    DWORD base;
+    DWORD alloc;
+    DWORD size;
+    DWORD read;
+} CDataStore;
+
 // hook entry structure
 // stores the offsets which are will be hooked
 // every different client version should has different offsets
@@ -124,7 +133,7 @@ bool GetOffsets(const HINSTANCE moduleHandle, const WORD build, HookEntry* entry
     _snprintf(fileName, MAX_PATH, "%s\\offsets.ini", dllPath);
     _snprintf(section, 6, "%i", build);
 
-    if (access(fileName, 0) == -1)
+    if (_access(fileName, 0) == -1)
     {
         printf("ERROR: File \"%s\" does not exist.\n", fileName);
         printf("\noffsets.ini template:\n");
