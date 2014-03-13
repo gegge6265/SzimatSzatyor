@@ -124,7 +124,7 @@ bool GetOffsets(const HINSTANCE moduleHandle, const WORD build, HookEntry* entry
     _snprintf(fileName, MAX_PATH, "%s\\offsets.ini", dllPath);
     _snprintf(section, 6, "%i", build);
 
-    if (access(fileName, 0) != -1)
+    if (access(fileName, 0) == -1)
     {
         printf("ERROR: File \"%s\" does not exist.\n", fileName);
         printf("\noffsets.ini template:\n");
