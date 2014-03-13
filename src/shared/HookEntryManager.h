@@ -17,7 +17,6 @@
 
 #pragma once
 #include <wtypes.h>
-#include <map>
 
 #define WOW_TBC_8606  8606
 #define WOW_MOP_16135 16135

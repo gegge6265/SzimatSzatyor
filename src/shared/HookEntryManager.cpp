@@ -18,6 +18,8 @@
 #include "HookEntryManager.h"
 #include <psapi.h>
 #include <Shlwapi.h>
+#include <cstdio>
+#include <io.h>
 
 /* static */
 WORD HookEntryManager::GetBuildNumberFromProcess(HANDLE hProcess /* = NULL */)
@@ -94,13 +96,24 @@ bool HookEntryManager::GetOffsets(const HINSTANCE moduleHandle, const WORD build
     _snprintf(fileName, MAX_PATH, "%s\\offsets.ini", dllPath);
     _snprintf(section, 6, "%i", build);
 
-    if (!GetPrivateProfileString(section, "send", "0", ret, 20, fileName))
-        return FALSE;
+    if (access(fileName, 0) != -1)
+    {
+        printf("ERROR: File \"%s\" does not exist.\n", fileName);
+        printf("\noffsets.ini template:\n");
+        printf("[build]\n");
+        printf("send = 0xDEADBEEF\n");
+        printf("recive=0xDEADBEEF\n");
+        printf("locale=0xDEADBEEF\n\n");
+        return false;
+    }
+
+    GetPrivateProfileString(section, "send", "0", ret, 20, fileName);
     entry->send = strtol(ret, 0, 0);
 
     GetPrivateProfileString(section, "recive", "0", ret, 20, fileName);
     entry->recive = strtol(ret, 0, 0);
 
+    // optional
     GetPrivateProfileString(section, "locale", "0", ret, 20, fileName);
     entry->locale = strtol(ret, 0, 0);
 
