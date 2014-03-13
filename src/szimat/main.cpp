@@ -21,7 +21,7 @@
 #include <cstdio>
 #include <ctime>
 #include "ConsoleManager.h"
-#include "HookEntryManager.h"
+#include "Shared.h"
 #include "HookManager.h"
 
 #define PKT_VERSION 0x0301
@@ -142,7 +142,7 @@ DWORD MainThreadControl(LPVOID /* param */)
     printf("restarting the WoW.\n\n");
 
     // gets the build number
-    buildNumber = HookEntryManager::GetBuildNumberFromProcess();
+    buildNumber = GetBuildNumberFromProcess();
     // error occured
     if (!buildNumber)
     {
@@ -152,9 +152,9 @@ DWORD MainThreadControl(LPVOID /* param */)
     }
     printf("Detected build number: %hu\n", buildNumber);
 
-    HookEntryManager::HookEntry hookEntry;
+    HookEntry hookEntry;
     // checks this build is supported or not
-    if (!HookEntryManager::GetOffsets(instanceDLL, buildNumber, &hookEntry))
+    if (!GetOffsets(instanceDLL, buildNumber, &hookEntry))
     {
         printf("ERROR: This build number is not supported.\n\n");
         system("pause");
@@ -185,7 +185,7 @@ DWORD MainThreadControl(LPVOID /* param */)
     printf("\nDLL path: %s\n", dllPath);
 
     // gets address of NetClient::Send2
-    sendAddress = baseAddress + hookEntry.send;
+    sendAddress = baseAddress + hookEntry.send_2;
     // hooks client's send function
     HookManager::Hook(sendAddress, (DWORD)SendHook, machineCodeHookSend, defaultMachineCodeSend);
     printf("Send is hooked.\n");

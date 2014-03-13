@@ -17,16 +17,10 @@
 
 #include <Windows.h>
 #include <TlHelp32.h>
-#include <psapi.h>
 #include <Aclapi.h>
-#include <Shlwapi.h>
-
-#include <cstring>
 #include <cstdio>
 #include <list>
-#include <algorithm>
-
-#include "HookEntryManager.h"
+#include "..\szimat\Shared.h"
 
 // default name of the process which will be hooked
 const char* lookingProcessName = "Wow.exe";
@@ -408,7 +402,7 @@ bool InjectDLL(DWORD processID, const char* dllLocation)
     printf("\nProcess [%u] '%s' is opened.\n", processID, lookingProcessName);
 
     // gets the build number
-    WORD buildNumber = HookEntryManager::GetBuildNumberFromProcess(hProcess);
+    WORD buildNumber = GetBuildNumberFromProcess(hProcess);
     // error occured
     if (!buildNumber)
     {
@@ -419,7 +413,7 @@ bool InjectDLL(DWORD processID, const char* dllLocation)
     printf("Detected build number: %hu\n", buildNumber);
 
     // checks this build is supported or not
-    if (!HookEntryManager::IsHookEntryExists(NULL, buildNumber))
+    if (!IsHookEntryExists(NULL, buildNumber))
     {
         printf("ERROR: This build number is not supported.\n");
         CloseHandle(hProcess);

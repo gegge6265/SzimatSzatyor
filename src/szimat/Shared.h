@@ -1,28 +1,55 @@
 /*
- * This file is part of SzimatSzatyor.
- *
- * SzimatSzatyor is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+* This file is part of SzimatSzatyor.
+*
+* SzimatSzatyor is free software: you can redistribute it and/or modify
+* it under the terms of the GNU General Public License as published by
+* the Free Software Foundation, either version 3 of the License, or
+* (at your option) any later version.
 
- * SzimatSzatyor is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+* SzimatSzatyor is distributed in the hope that it will be useful,
+* but WITHOUT ANY WARRANTY; without even the implied warranty of
+* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+* GNU General Public License for more details.
 
- * You should have received a copy of the GNU General Public License
- * along with SzimatSzatyor.  If not, see <http://www.gnu.org/licenses/>.
- */
+* You should have received a copy of the GNU General Public License
+* along with SzimatSzatyor.  If not, see <http://www.gnu.org/licenses/>.
+*/
 
-#include "HookEntryManager.h"
+#pragma once
+#include <wtypes.h>
 #include <psapi.h>
 #include <Shlwapi.h>
 #include <cstdio>
 #include <io.h>
 
-/* static */
-WORD HookEntryManager::GetBuildNumberFromProcess(HANDLE hProcess /* = NULL */)
+#define WOW_TBC_8606  8606
+#define WOW_MOP_16135 16135
+
+// hook entry structure
+// stores the offsets which are will be hooked
+// every different client version should has different offsets
+typedef struct {
+    // offset of NetClient::Send2 to sniff client packets
+    DWORD send_2;
+    // offset of NetClient::ProcessMessage to sniff server packets
+    DWORD recive;
+    // offset of client locale "xxXX"
+    DWORD locale;
+} HookEntry;
+
+// returns the build number of the client
+// returns 0 if an error occurred
+// (gets this from file version info of client's exe)
+//
+// param should be NULL when would like to get the
+// path of the _current_ process' executable
+// this means the sniffer should call this with NULL because
+// the sniffer is just a "thread" which running in WoW
+//
+// param should NOT be NULL when would like to get the
+// path of an _external_ process' executable
+// so in the injector the param should contain the handle of a WoW process
+WORD GetBuildNumberFromProcess(HANDLE hProcess = NULL)
 {
     // will contain where the process is which will be injected
     char processExePath[MAX_PATH];
@@ -59,7 +86,7 @@ WORD HookEntryManager::GetBuildNumberFromProcess(HANDLE hProcess /* = NULL */)
     if (!GetFileVersionInfo(processExePath, 0, fileVersionInfoSize, fileVersionInfoBuffer))
     {
         printf("ERROR: Can't get file version info, ErrorCode: %u\n", GetLastError());
-        delete [] fileVersionInfoBuffer;
+        delete[] fileVersionInfoBuffer;
         return 0;
     }
 
@@ -72,17 +99,18 @@ WORD HookEntryManager::GetBuildNumberFromProcess(HANDLE hProcess /* = NULL */)
     if (!VerQueryValue(fileVersionInfoBuffer, "\\", (LPVOID*)&fileInfo, NULL))
     {
         printf("ERROR: File version info query is failed.\n");
-        delete [] fileVersionInfoBuffer;
+        delete[] fileVersionInfoBuffer;
         return 0;
     }
 
     // last (low) 2 bytes
     WORD buildNumber = fileInfo->dwFileVersionLS & 0xFFFF;
-    delete [] fileVersionInfoBuffer;
+    delete[] fileVersionInfoBuffer;
     return buildNumber;
 }
 
-bool HookEntryManager::GetOffsets(const HINSTANCE moduleHandle, const WORD build, HookEntry* entry)
+// return the HookEntry from current build
+bool GetOffsets(const HINSTANCE moduleHandle, const WORD build, HookEntry* entry)
 {
     char ret[20];
     char fileName[MAX_PATH];
@@ -101,14 +129,14 @@ bool HookEntryManager::GetOffsets(const HINSTANCE moduleHandle, const WORD build
         printf("ERROR: File \"%s\" does not exist.\n", fileName);
         printf("\noffsets.ini template:\n");
         printf("[build]\n");
-        printf("send = 0xDEADBEEF\n");
+        printf("send_2=0xDEADBEEF\n");
         printf("recive=0xDEADBEEF\n");
         printf("locale=0xDEADBEEF\n\n");
         return false;
     }
 
-    GetPrivateProfileString(section, "send", "0", ret, 20, fileName);
-    entry->send = strtol(ret, 0, 0);
+    GetPrivateProfileString(section, "send_2", "0", ret, 20, fileName);
+    entry->send_2 = strtol(ret, 0, 0);
 
     GetPrivateProfileString(section, "recive", "0", ret, 20, fileName);
     entry->recive = strtol(ret, 0, 0);
@@ -117,5 +145,13 @@ bool HookEntryManager::GetOffsets(const HINSTANCE moduleHandle, const WORD build
     GetPrivateProfileString(section, "locale", "0", ret, 20, fileName);
     entry->locale = strtol(ret, 0, 0);
 
-    return entry->recive != 0 && entry->send != 0;
+    return entry->recive != 0 && entry->send_2 != 0;
+}
+
+// returns true if hook entry exists for this specified build number
+// otherwise false
+bool IsHookEntryExists(const HINSTANCE moduleHandle, WORD buildNumber)
+{
+    HookEntry entry;
+    return GetOffsets(moduleHandle, buildNumber, &entry);
 }
