@@ -41,6 +41,7 @@ volatile bool isSigIntOccured = false;
 // global access to the build number
 WORD buildNumber = 0;
 char locale[5] = { 'x', 'x', 'X', 'X', '\0' };
+HookEntry hookEntry;
 
 // this function will be called when send called in the client
 // client has thiscall calling convention
@@ -145,7 +146,6 @@ DWORD MainThreadControl(LPVOID /* param */)
     }
     printf("Detected build number: %hu\n", buildNumber);
 
-    HookEntry hookEntry;
     // checks this build is supported or not
     if (!GetOffsets(instanceDLL, buildNumber, &hookEntry))
     {
@@ -261,13 +261,12 @@ static void DumpPacket(DWORD packetType, DWORD connectionId, WORD opcodeSize, CD
 
     BYTE* packetData     = dataStore->buffer + opcodeSize;
     DWORD packetDataSize = dataStore->size   - opcodeSize;
-    DWORD fullSize       = packetDataSize    + opcodeSize;
 
     fwrite((DWORD*)&packetType,           4, 1, fileDump);  // direction of the packet
     fwrite((DWORD*)&connectionId,         4, 1, fileDump);  // connection id
     fwrite((DWORD*)&rawTime,              4, 1, fileDump);  // timestamp of the packet
     fwrite((DWORD*)&optionalHeaderLength, 4, 1, fileDump);  // connection id
-    fwrite((DWORD*)&fullSize,             4, 1, fileDump);  // size of the packet + opcode lenght
+    fwrite((DWORD*)&dataStore->size,      4, 1, fileDump);  // size of the packet + opcode lenght
     fwrite((DWORD*)&packetOpcode,         4, 1, fileDump);  // opcode
 
     fwrite(packetData, packetDataSize, 1, fileDump); // data
