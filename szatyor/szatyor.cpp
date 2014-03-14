@@ -1,36 +1,30 @@
 /*
- * This file is part of SzimatSzatyor.
- *
- * SzimatSzatyor is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+* This file is part of SzimatSzatyor.
+*
+* SzimatSzatyor is free software: you can redistribute it and/or modify
+* it under the terms of the GNU General Public License as published by
+* the Free Software Foundation, either version 3 of the License, or
+* (at your option) any later version.
 
- * SzimatSzatyor is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+* SzimatSzatyor is distributed in the hope that it will be useful,
+* but WITHOUT ANY WARRANTY; without even the implied warranty of
+* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+* GNU General Public License for more details.
 
- * You should have received a copy of the GNU General Public License
- * along with SzimatSzatyor.  If not, see <http://www.gnu.org/licenses/>.
- */
+* You should have received a copy of the GNU General Public License
+* along with SzimatSzatyor.  If not, see <http://www.gnu.org/licenses/>.
+*/
 
 #include <Windows.h>
 #include <TlHelp32.h>
-#include <psapi.h>
 #include <Aclapi.h>
-#include <Shlwapi.h>
-
-#include <cstring>
 #include <cstdio>
 #include <list>
-#include <algorithm>
-
-#include "HookEntryManager.h"
+#include "..\szimat\Shared.h"
 
 // default name of the process which will be hooked
 const char* lookingProcessName = "Wow.exe";
- // this DLL will be injected
+// this DLL will be injected
 const char injectDLLName[] = "szimat.dll";
 
 // this module contains function loadDLLFunctionName
@@ -148,8 +142,7 @@ int main(int argc, char* argv[])
             // 0 or non int used
             else if (selectedIndex == 0)
             {
-                printf("Your index is invalid, 1-%u should be used.\n",
-                       idx - 1);
+                printf("Your index is invalid, 1-%u should be used.\n", idx - 1);
                 continue;
             }
 
@@ -159,10 +152,7 @@ int main(int argc, char* argv[])
             processID = *itr;
 
             // if already injected
-            if (std::find(injectedPIDs.begin(),
-                          injectedPIDs.end(),
-                          processID)
-                                     != injectedPIDs.end())
+            if (std::find(injectedPIDs.begin(), injectedPIDs.end(), processID) != injectedPIDs.end())
             {
                 printf("This process is already injected. ");
                 printf("Please choose a different one.\n");
@@ -182,7 +172,7 @@ int main(int argc, char* argv[])
     if (!injectorPathSize)
     {
         printf("ERROR: Can't get the injector's path, ");
-        printf("ErrorCode: %u\n\n",  GetLastError());
+        printf("ErrorCode: %u\n\n", GetLastError());
         system("pause");
         return 0;
     }
@@ -205,9 +195,9 @@ int main(int argc, char* argv[])
     else
         printf("\nInjection of '%s' is NOT successful.\n\n", injectDLLName);
 
-    delete [] dllPath;
+    delete[] dllPath;
 
-    system("pause");
+    //system("pause");
     return 0;
 }
 
@@ -259,8 +249,7 @@ bool IsProcessAlreadyInjected(DWORD PID, const char* moduleName)
         DWORD bytesReq = 0;
         if (!EnumProcessModules(clientProcess, modules, sizeof(modules), &bytesReq))
         {
-            printf("Can't get process' modules. ErrorCode: %u\n",
-                   GetLastError());
+            printf("Can't get process' modules. ErrorCode: %u\n", GetLastError());
             CloseHandle(clientProcess);
             return false;
         }
@@ -304,8 +293,8 @@ HANDLE OpenClientProcess(DWORD processID)
     // tries to open the targeted process
     // note: don't use PROCESS_ALL_ACCESS
     HANDLE hProcess = OpenProcess(PROCESS_VM_OPERATION | PROCESS_VM_READ |
-                                  PROCESS_VM_WRITE |PROCESS_QUERY_INFORMATION |
-                                  PROCESS_CREATE_THREAD, FALSE, processID);
+        PROCESS_VM_WRITE | PROCESS_QUERY_INFORMATION |
+        PROCESS_CREATE_THREAD, FALSE, processID);
     // error?
     if (!hProcess)
     {
@@ -334,14 +323,7 @@ HANDLE OpenClientProcess(DWORD processID)
             PSECURITY_DESCRIPTOR securityDescriptor;
 
             // gets injector's security descriptor
-            error = GetSecurityInfo(GetCurrentProcess(),
-                                    SE_KERNEL_OBJECT,
-                                    DACL_SECURITY_INFORMATION,
-                                    NULL,
-                                    NULL,
-                                    &dacl,
-                                    NULL,
-                                    &securityDescriptor);
+            error = GetSecurityInfo(GetCurrentProcess(), SE_KERNEL_OBJECT, DACL_SECURITY_INFORMATION, NULL, NULL, &dacl, NULL, &securityDescriptor);
             if (error)
             {
                 printf("ERROR: Can't get injector's security secriptor, ");
@@ -361,14 +343,7 @@ HANDLE OpenClientProcess(DWORD processID)
             }
 
             // overrides client's DACL with injector's DACL
-            error = SetSecurityInfo(hProcess,
-                                    SE_KERNEL_OBJECT,
-                                    DACL_SECURITY_INFORMATION |
-                                    UNPROTECTED_DACL_SECURITY_INFORMATION,
-                                    0,
-                                    0,
-                                    dacl,
-                                    0);
+            error = SetSecurityInfo(hProcess, SE_KERNEL_OBJECT, DACL_SECURITY_INFORMATION | UNPROTECTED_DACL_SECURITY_INFORMATION, 0, 0, dacl, 0);
             if (error)
             {
                 LocalFree(securityDescriptor);
@@ -421,18 +396,13 @@ bool InjectDLL(DWORD processID, const char* dllLocation)
     HANDLE hProcess = OpenClientProcess(processID);
     if (!hProcess)
     {
-        printf("Process [%u] '%s' open is failed.\n",
-               processID,
-               lookingProcessName);
+        printf("Process [%u] '%s' open is failed.\n", processID, lookingProcessName);
         return false;
     }
     printf("\nProcess [%u] '%s' is opened.\n", processID, lookingProcessName);
 
-    // inits the HookManager
-    HookEntryManager::FillHookEntries();
-
     // gets the build number
-    WORD buildNumber = HookEntryManager::GetBuildNumberFromProcess(hProcess);
+    WORD buildNumber = GetBuildNumberFromProcess(hProcess);
     // error occured
     if (!buildNumber)
     {
@@ -443,7 +413,7 @@ bool InjectDLL(DWORD processID, const char* dllLocation)
     printf("Detected build number: %hu\n", buildNumber);
 
     // checks this build is supported or not
-    if (!HookEntryManager::IsHookEntryExists(buildNumber))
+    if (!IsHookEntryExists(NULL, buildNumber))
     {
         printf("ERROR: This build number is not supported.\n");
         CloseHandle(hProcess);
@@ -451,11 +421,7 @@ bool InjectDLL(DWORD processID, const char* dllLocation)
     }
 
     // allocates memory for the DLL location string
-    LPVOID allocatedMemoryAddress = VirtualAllocEx(hProcess,
-                                                   NULL,
-                                                   strlen(dllLocation),
-                                                   MEM_COMMIT,
-                                                   PAGE_READWRITE);
+    LPVOID allocatedMemoryAddress = VirtualAllocEx(hProcess, NULL, strlen(dllLocation), MEM_COMMIT, PAGE_READWRITE);
     if (!allocatedMemoryAddress)
     {
         printf("ERROR: Virtual memory allocation is failed, ");
@@ -466,11 +432,7 @@ bool InjectDLL(DWORD processID, const char* dllLocation)
 
     // writes the DLL location string to the process
     // so this is the parameter which will be passed to LoadLibraryA
-    if (!WriteProcessMemory(hProcess,
-                            allocatedMemoryAddress,
-                            dllLocation,
-                            strlen(dllLocation),
-                            NULL))
+    if (!WriteProcessMemory(hProcess, allocatedMemoryAddress, dllLocation, strlen(dllLocation), NULL))
     {
         printf("ERROR: Process memory writing is failed, ");
         printf("ErrorCode: %u\n", GetLastError());
@@ -482,14 +444,7 @@ bool InjectDLL(DWORD processID, const char* dllLocation)
     // creates a thread that runs in the virtual address space of
     // the process which should be injected and gives the
     // parameter (allocatedMemoryAddress) to LoadLibraryA(loadLibraryAddress)
-    HANDLE hRemoteThread = CreateRemoteThread(hProcess,
-                                              NULL,
-                                              0,
-                                              (LPTHREAD_START_ROUTINE)
-                                              loadLibraryAddress,
-                                              allocatedMemoryAddress,
-                                              0,
-                                              NULL);
+    HANDLE hRemoteThread = CreateRemoteThread(hProcess, NULL, 0, (LPTHREAD_START_ROUTINE)loadLibraryAddress, allocatedMemoryAddress, 0, NULL);
     if (!hRemoteThread)
     {
         printf("ERROR: Remote thread creation is failed, ");
