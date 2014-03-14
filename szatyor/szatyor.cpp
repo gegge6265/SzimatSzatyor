@@ -1,19 +1,19 @@
 /*
- * This file is part of SzimatSzatyor.
- *
- * SzimatSzatyor is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+* This file is part of SzimatSzatyor.
+*
+* SzimatSzatyor is free software: you can redistribute it and/or modify
+* it under the terms of the GNU General Public License as published by
+* the Free Software Foundation, either version 3 of the License, or
+* (at your option) any later version.
 
- * SzimatSzatyor is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+* SzimatSzatyor is distributed in the hope that it will be useful,
+* but WITHOUT ANY WARRANTY; without even the implied warranty of
+* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+* GNU General Public License for more details.
 
- * You should have received a copy of the GNU General Public License
- * along with SzimatSzatyor.  If not, see <http://www.gnu.org/licenses/>.
- */
+* You should have received a copy of the GNU General Public License
+* along with SzimatSzatyor.  If not, see <http://www.gnu.org/licenses/>.
+*/
 
 #include <Windows.h>
 #include <TlHelp32.h>
@@ -24,7 +24,7 @@
 
 // default name of the process which will be hooked
 const char* lookingProcessName = "Wow.exe";
- // this DLL will be injected
+// this DLL will be injected
 const char injectDLLName[] = "szimat.dll";
 
 // this module contains function loadDLLFunctionName
@@ -172,7 +172,7 @@ int main(int argc, char* argv[])
     if (!injectorPathSize)
     {
         printf("ERROR: Can't get the injector's path, ");
-        printf("ErrorCode: %u\n\n",  GetLastError());
+        printf("ErrorCode: %u\n\n", GetLastError());
         system("pause");
         return 0;
     }
@@ -195,7 +195,7 @@ int main(int argc, char* argv[])
     else
         printf("\nInjection of '%s' is NOT successful.\n\n", injectDLLName);
 
-    delete [] dllPath;
+    delete[] dllPath;
 
     //system("pause");
     return 0;
@@ -293,8 +293,8 @@ HANDLE OpenClientProcess(DWORD processID)
     // tries to open the targeted process
     // note: don't use PROCESS_ALL_ACCESS
     HANDLE hProcess = OpenProcess(PROCESS_VM_OPERATION | PROCESS_VM_READ |
-                                  PROCESS_VM_WRITE |PROCESS_QUERY_INFORMATION |
-                                  PROCESS_CREATE_THREAD, FALSE, processID);
+        PROCESS_VM_WRITE | PROCESS_QUERY_INFORMATION |
+        PROCESS_CREATE_THREAD, FALSE, processID);
     // error?
     if (!hProcess)
     {

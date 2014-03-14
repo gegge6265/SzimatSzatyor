@@ -20,6 +20,8 @@ build/*
 *.obj
 *.pdb
 *.ilk
+*.idb
+*.ipch
 
 *.sdf
 *.opensdf

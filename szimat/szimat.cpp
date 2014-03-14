@@ -1,23 +1,22 @@
 /*
- * This file is part of SzimatSzatyor.
- *
- * SzimatSzatyor is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+* This file is part of SzimatSzatyor.
+*
+* SzimatSzatyor is free software: you can redistribute it and/or modify
+* it under the terms of the GNU General Public License as published by
+* the Free Software Foundation, either version 3 of the License, or
+* (at your option) any later version.
 
- * SzimatSzatyor is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+* SzimatSzatyor is distributed in the hope that it will be useful,
+* but WITHOUT ANY WARRANTY; without even the implied warranty of
+* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+* GNU General Public License for more details.
 
- * You should have received a copy of the GNU General Public License
- * along with SzimatSzatyor.  If not, see <http://www.gnu.org/licenses/>.
- */
+* You should have received a copy of the GNU General Public License
+* along with SzimatSzatyor.  If not, see <http://www.gnu.org/licenses/>.
+*/
 
 #include <Windows.h>
 #include <Shlwapi.h>
-
 #include <cstdio>
 #include <ctime>
 #include "ConsoleManager.h"
@@ -51,7 +50,7 @@ HookEntry hookEntry;
 // the second one is just a dummy (not used)
 DWORD __fastcall SendHook(void* thisPTR, void* /* dummy */, CDataStore* /* dataStore */, void* /* param2 */);
 // this send prototype fits with the client's one
-typedef DWORD (__thiscall *SendProto)(void*, void*, void*);
+typedef DWORD(__thiscall *SendProto)(void*, void*, void*);
 
 // address of WoW's send function
 DWORD sendAddress = 0;
@@ -65,9 +64,9 @@ BYTE defaultMachineCodeSend[JMP_INSTRUCTION_SIZE] = { 0 };
 // this function will be called when recv called in the client
 DWORD __fastcall RecvHook(void* thisPTR, void* /* dummy */, void* /* param1 */, CDataStore* /* dataStore */, void* /* param3 */);
 // this recv prototype fits with the client's one
-typedef DWORD (__thiscall *RecvProto)(void*, void*, void*, void*);
+typedef DWORD(__thiscall *RecvProto)(void*, void*, void*, void*);
 // clients which has build number <= 8606 have different prototype
-typedef DWORD (__thiscall *RecvProto8606)(void*, void*, void*);
+typedef DWORD(__thiscall *RecvProto8606)(void*, void*, void*);
 
 // address of WoW's recv function
 DWORD recvAddress = 0;
@@ -171,7 +170,7 @@ DWORD MainThreadControl(LPVOID /* param */)
     if (!dllPathSize)
     {
         printf("\nERROR: Can't get the injected DLL's location, ");
-        printf("ErrorCode: %u\n\n",  GetLastError());
+        printf("ErrorCode: %u\n\n", GetLastError());
         system("pause");
         FreeLibraryAndExitThread((HMODULE)instanceDLL, 0);
     }
@@ -204,7 +203,7 @@ DWORD MainThreadControl(LPVOID /* param */)
     return 0;
 }
 
-static void DumpPacket(DWORD packetType, DWORD connectionId, WORD opcodeSize, CDataStore* dataStore)
+void DumpPacket(DWORD packetType, DWORD connectionId, WORD opcodeSize, CDataStore* dataStore)
 {
     // gets the time
     time_t rawTime;
@@ -220,14 +219,14 @@ static void DumpPacket(DWORD packetType, DWORD connectionId, WORD opcodeSize, CD
         PathRemoveFileSpec(dllPath);
         // fills the basic file name format
         _snprintf(fileName, MAX_PATH,
-                  "wowsniff_%s_%u_%d-%02d-%02d_%02d-%02d-%02d.pkt",
-                  locale, buildNumber,
-                  date->tm_year + 1900,
-                  date->tm_mon + 1,
-                  date->tm_mday,
-                  date->tm_hour,
-                  date->tm_min,
-                  date->tm_sec);
+            "wowsniff_%s_%u_%d-%02d-%02d_%02d-%02d-%02d.pkt",
+            locale, buildNumber,
+            date->tm_year + 1900,
+            date->tm_mon + 1,
+            date->tm_mday,
+            date->tm_hour,
+            date->tm_min,
+            date->tm_sec);
 
         // some info
         printf("Sniff dump: %s\n\n", fileName);
@@ -242,34 +241,34 @@ static void DumpPacket(DWORD packetType, DWORD connectionId, WORD opcodeSize, CD
 
         fileDump = fopen(fullFileName, "ab");
         // PKT 3.1 header
-        fwrite("PKT",                         3, 1, fileDump);  // magic
-        fwrite((WORD*)&pkt_version,           2, 1, fileDump);  // major.minor version
-        fwrite((BYTE*)&sniffer_id,            1, 1, fileDump);  // sniffer id
-        fwrite((DWORD*)&buildNumber,          4, 1, fileDump);  // client build
-        fwrite(locale,                        4, 1, fileDump);  // client lang
-        fwrite(sessionKey,                    40,1, fileDump);  // session key
-        fwrite((DWORD*)&rawTime,              4, 1, fileDump);  // started time
-        fwrite((DWORD*)&tickCount,            4, 1, fileDump);  // started tick's
-        fwrite((DWORD*)&optionalHeaderLength, 4, 1, fileDump);  // opional header length
+        fwrite("PKT",                           3, 1, fileDump);  // magic
+        fwrite((WORD*)&pkt_version,             2, 1, fileDump);  // major.minor version
+        fwrite((BYTE*)&sniffer_id,              1, 1, fileDump);  // sniffer id
+        fwrite((DWORD*)&buildNumber,            4, 1, fileDump);  // client build
+        fwrite(locale,                          4, 1, fileDump);  // client lang
+        fwrite(sessionKey,                     40, 1, fileDump);  // session key
+        fwrite((DWORD*)&rawTime,                4, 1, fileDump);  // started time
+        fwrite((DWORD*)&tickCount,              4, 1, fileDump);  // started tick's
+        fwrite((DWORD*)&optionalHeaderLength,   4, 1, fileDump);  // opional header length
 
         fflush(fileDump);
     }
 
     DWORD packetOpcode = opcodeSize == 4
         ? *(DWORD*)dataStore->buffer
-        : *( WORD*)dataStore->buffer;
+        : *(WORD*)dataStore->buffer;
 
     BYTE* packetData     = dataStore->buffer + opcodeSize;
     DWORD packetDataSize = dataStore->size   - opcodeSize;
 
-    fwrite((DWORD*)&packetType,           4, 1, fileDump);  // direction of the packet
-    fwrite((DWORD*)&connectionId,         4, 1, fileDump);  // connection id
-    fwrite((DWORD*)&rawTime,              4, 1, fileDump);  // timestamp of the packet
-    fwrite((DWORD*)&optionalHeaderLength, 4, 1, fileDump);  // connection id
-    fwrite((DWORD*)&dataStore->size,      4, 1, fileDump);  // size of the packet + opcode lenght
-    fwrite((DWORD*)&packetOpcode,         4, 1, fileDump);  // opcode
+    fwrite((DWORD*)&packetType,             4, 1, fileDump);  // direction of the packet
+    fwrite((DWORD*)&connectionId,           4, 1, fileDump);  // connection id
+    fwrite((DWORD*)&rawTime,                4, 1, fileDump);  // timestamp of the packet
+    fwrite((DWORD*)&optionalHeaderLength,   4, 1, fileDump);  // connection id
+    fwrite((DWORD*)&dataStore->size,        4, 1, fileDump);  // size of the packet + opcode lenght
+    fwrite((DWORD*)&packetOpcode,           4, 1, fileDump);  // opcode
 
-    fwrite(packetData, packetDataSize, 1, fileDump); // data
+    fwrite(packetData, packetDataSize,         1, fileDump);  // data
 
 #if _DEBUG
     printf("%s Opcode: %-8u Size: %-8u\n", packetType == CMSG ? "CMSG" : "SMSG", packetOpcode, packetDataSize);
