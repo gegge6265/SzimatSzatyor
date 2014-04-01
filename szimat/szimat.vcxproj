@@ -94,6 +94,7 @@ copy $(SolutionDir)README $(OutDir)</Command>
     <ClInclude Include="ConsoleManager.h" />
     <ClInclude Include="HookManager.h" />
     <ClInclude Include="Shared.h" />
+    <ClInclude Include="szimat.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="offsets.ini" />
