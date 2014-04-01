@@ -22,6 +22,7 @@
 #include "ConsoleManager.h"
 #include "Shared.h"
 #include "HookManager.h"
+#include <mutex>
 
 #define PKT_VERSION 0x0301
 #define SNIFFER_ID  15
@@ -31,6 +32,8 @@
 
 // static member initilization
 volatile bool* ConsoleManager::_sniffingLoopCondition = NULL;
+
+std::mutex mtx;
 
 // needed to correctly shutdown the sniffer
 HINSTANCE instanceDLL = NULL;
@@ -205,6 +208,7 @@ DWORD MainThreadControl(LPVOID /* param */)
 
 void DumpPacket(DWORD packetType, DWORD connectionId, WORD opcodeSize, CDataStore* dataStore)
 {
+    mtx.lock();
     // gets the time
     time_t rawTime;
     time(&rawTime);
@@ -275,6 +279,8 @@ void DumpPacket(DWORD packetType, DWORD connectionId, WORD opcodeSize, CDataStor
 #endif
 
     fflush(fileDump);
+
+    mtx.unlock();
 }
 
 DWORD __fastcall SendHook(void* thisPTR, void* /* dummy */, CDataStore* dataStore, void* param2)
