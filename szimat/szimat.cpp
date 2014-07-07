@@ -167,7 +167,7 @@ void DumpPacket(DWORD packetType, DWORD connectionId, WORD opcodeSize, CDataStor
         DWORD tickCount     = GetTickCount();
         BYTE sessionKey[40] = { 0 };
 
-        fileDump = fopen(fullFileName, "ab");
+        fileDump = fopen(fullFileName, "wb");
         // PKT 3.1 header
         fwrite("PKT",                           3, 1, fileDump);  // magic
         fwrite((WORD*)&pkt_version,             2, 1, fileDump);  // major.minor version
