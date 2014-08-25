@@ -62,6 +62,7 @@
 #define WOW_WOD_18505   18505
 #define WOW_WOD_18702   18702
 #define WOW_WOD_18716   18716
+#define WOW_WOD_18764   18764
 // stores and manages hook entries
 // this will be compiled into a static lib
 // so both of the injector and the DLL too can use this class
@@ -166,6 +167,7 @@ public:
         FillHookEntry18505();
 		FillHookEntry18702();
 		FillHookEntry18716();
+		FillHookEntry18764();
     }
 
     // checks all the hook entries
@@ -484,6 +486,13 @@ private:
 	{
 		HookEntry hookEntry18716 = HookEntry(0x2AA505, 0x2A8391, EXP_WOD);
 		_hookEntryMap[WOW_WOD_18716] = hookEntry18716;
+	}
+
+	// address offset for WOD, 18764
+	static void FillHookEntry18764()
+	{
+		HookEntry hookEntry18764 = HookEntry(0x2A9664, 0x2A74E7, EXP_WOD);
+		_hookEntryMap[WOW_WOD_18764] = hookEntry18764;
 	}
     // type for storing hook entries
     typedef std::map<WORD /* buildNumber */, HookEntry> HookEntryMap;
