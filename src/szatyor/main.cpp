@@ -108,7 +108,7 @@ int main(int argc, char* argv[])
     if (pids.empty() && argc != 2)
     {
         // lets check is there a beta/alpha process
-        lookingProcessName = "WowB.exe";
+        lookingProcessName = "WowT.exe";
         pids = GetProcessIDsByName(lookingProcessName);
     }
 
