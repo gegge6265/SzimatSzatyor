@@ -112,7 +112,20 @@ DWORD MainThreadControl(LPVOID /* param */)
     // gets address of NetClient::ProcessMessage
     recvAddress = baseAddress + hookEntry.recive;
     // hooks client's recv function
-    HookManager::Hook(recvAddress, (DWORD)RecvHook, machineCodeHookRecv, defaultMachineCodeRecv);
+
+    if (buildNumber < 8606)
+    {
+        HookManager::Hook(recvAddress, (DWORD)RecvHook3, machineCodeHookRecv, defaultMachineCodeRecv);
+    }
+    else if (buildNumber < 18379)
+    {
+        HookManager::Hook(recvAddress, (DWORD)RecvHook4, machineCodeHookRecv, defaultMachineCodeRecv);
+    }
+    else
+    {
+        HookManager::Hook(recvAddress, (DWORD)RecvHook5, machineCodeHookRecv, defaultMachineCodeRecv);
+    }
+
     printf("Recv is hooked.\n");
 
     // loops until SIGINT (CTRL-C) occurs
@@ -207,7 +220,7 @@ void DumpPacket(DWORD packetType, DWORD connectionId, WORD opcodeSize, CDataStor
     mtx.unlock();
 }
 
-DWORD __fastcall SendHook(void* thisPTR, void* /* dummy */, CDataStore* dataStore, void* param2)
+DWORD __fastcall SendHook(void* thisPTR, void* dummy , CDataStore* dataStore, void* param2)
 {
     // dumps the packet
     DumpPacket(CMSG, 0, 4, dataStore);
@@ -231,7 +244,32 @@ DWORD __fastcall SendHook(void* thisPTR, void* /* dummy */, CDataStore* dataStor
     return 0;
 }
 
-DWORD __fastcall RecvHook(void* thisPTR, void* /* dummy */, void* param1, CDataStore* dataStore, void* param3)
+#pragma region RecvHook
+
+DWORD __fastcall RecvHook3(void* thisPTR, void* dummy, void* param1, CDataStore* dataStore)
+{
+    // packet dump
+    DumpPacket(SMSG, 0, 2, dataStore);
+
+    // unhooks the recv function
+    HookManager::UnHook(recvAddress, defaultMachineCodeRecv);
+
+    // calls client's function so it can processes the packet
+    DWORD returnValue = RecvProto3(recvAddress)(thisPTR, param1, dataStore);
+
+    // hooks again to catch the next incoming packets also
+    HookManager::ReHook(recvAddress, machineCodeHookRecv);
+
+    if (!recvHookGood)
+    {
+        printf("Recv hook3 is working.\n");
+        recvHookGood = true;
+    }
+
+    return returnValue;
+}
+
+DWORD __fastcall RecvHook4(void* thisPTR, void* dummy, void* param1, CDataStore* dataStore, void* param3)
 {
     WORD opcodeSize = buildNumber <= WOW_MOP_16135 ? 2 : 4;
     // packet dump
@@ -241,20 +279,41 @@ DWORD __fastcall RecvHook(void* thisPTR, void* /* dummy */, void* param1, CDataS
     HookManager::UnHook(recvAddress, defaultMachineCodeRecv);
 
     // calls client's function so it can processes the packet
-    DWORD returnValue = 0;
-    if (buildNumber <= WOW_TBC_8606) // different prototype
-        returnValue = RecvProto8606(recvAddress)(thisPTR, param1, dataStore);
-    else
-        returnValue = RecvProto(recvAddress)(thisPTR, param1, dataStore, param3);
+    DWORD returnValue = RecvProto4(recvAddress)(thisPTR, param1, dataStore, param3);
 
     // hooks again to catch the next incoming packets also
     HookManager::ReHook(recvAddress, machineCodeHookRecv);
 
     if (!recvHookGood)
     {
-        printf("Recv hook is working.\n");
+        printf("Recv hook4 is working.\n");
         recvHookGood = true;
     }
 
     return returnValue;
 }
+
+DWORD __fastcall RecvHook5(void* thisPTR, void* dummy, void* param1, void* param2, CDataStore* dataStore, void* param4)
+{
+    // packet dump
+    DumpPacket(SMSG, 0, 4, dataStore);
+
+    // unhooks the recv function
+    HookManager::UnHook(recvAddress, defaultMachineCodeRecv);
+
+    // calls client's function so it can processes the packet
+    DWORD returnValue = RecvProto5(recvAddress)(thisPTR, param1, param2, dataStore, param4);
+
+    // hooks again to catch the next incoming packets also
+    HookManager::ReHook(recvAddress, machineCodeHookRecv);
+
+    if (!recvHookGood)
+    {
+        printf("Recv hook5 is working.\n");
+        recvHookGood = true;
+    }
+
+    return returnValue;
+}
+
+#pragma endregion

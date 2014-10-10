@@ -51,8 +51,8 @@ HookEntry hookEntry;
 // fastcall convention means that the first 2 parameters is passed
 // via ECX and EDX registers so the first param will be the this pointer and
 // the second one is just a dummy (not used)
-DWORD __fastcall SendHook(void* thisPTR, void* /* dummy */, CDataStore* /* dataStore */, void* /* param2 */);
-// this send prototype fits with the client's one
+DWORD __fastcall SendHook(void* thisPTR, void*, CDataStore*, void*);
+
 typedef DWORD(__thiscall *SendProto)(void*, void*, void*);
 
 // address of WoW's send function
@@ -65,11 +65,13 @@ BYTE machineCodeHookSend[JMP_INSTRUCTION_SIZE] = { 0 };
 BYTE defaultMachineCodeSend[JMP_INSTRUCTION_SIZE] = { 0 };
 
 // this function will be called when recv called in the client
-DWORD __fastcall RecvHook(void* thisPTR, void* /* dummy */, void* /* param1 */, CDataStore* /* dataStore */, void* /* param3 */);
-// this recv prototype fits with the client's one
-typedef DWORD(__thiscall *RecvProto)(void*, void*, void*, void*);
-// clients which has build number <= 8606 have different prototype
-typedef DWORD(__thiscall *RecvProto8606)(void*, void*, void*);
+DWORD __fastcall RecvHook3(void* thisPTR, void* dummy, void* param1, CDataStore* dataStore);
+DWORD __fastcall RecvHook4(void* thisPTR, void* dummy, void* param1, CDataStore* dataStore, void* param3);
+DWORD __fastcall RecvHook5(void* thisPTR, void* dummy, void* param1, void* param2, CDataStore* dataStore, void* param4);
+
+typedef DWORD(__thiscall *RecvProto3)(void*, void*, void*);
+typedef DWORD(__thiscall *RecvProto4)(void*, void*, void*, void*);
+typedef DWORD(__thiscall *RecvProto5)(void*, void*, void*, void*, void*);
 
 // address of WoW's recv function
 DWORD recvAddress = 0;
