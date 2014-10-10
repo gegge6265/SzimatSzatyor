@@ -117,7 +117,7 @@ DWORD MainThreadControl(LPVOID /* param */)
     {
         HookManager::Hook(recvAddress, (DWORD)RecvHook3, machineCodeHookRecv, defaultMachineCodeRecv);
     }
-    else if (buildNumber < 18379)
+    else if (buildNumber < 19005)
     {
         HookManager::Hook(recvAddress, (DWORD)RecvHook4, machineCodeHookRecv, defaultMachineCodeRecv);
     }
