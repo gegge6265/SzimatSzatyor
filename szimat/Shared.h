@@ -22,7 +22,6 @@
 #include <cstdio>
 #include <io.h>
 
-#define WOW_TBC_8606  8606
 #define WOW_MOP_16135 16135
 
 typedef struct {

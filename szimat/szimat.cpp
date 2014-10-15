@@ -117,7 +117,7 @@ DWORD MainThreadControl(LPVOID /* param */)
     {
         HookManager::Hook(recvAddress, (DWORD)RecvHook3, machineCodeHookRecv, defaultMachineCodeRecv);
     }
-    else if (buildNumber < 19005)
+    else if (buildNumber < 19000)
     {
         HookManager::Hook(recvAddress, (DWORD)RecvHook4, machineCodeHookRecv, defaultMachineCodeRecv);
     }
@@ -223,7 +223,7 @@ void DumpPacket(DWORD packetType, DWORD connectionId, WORD opcodeSize, CDataStor
 DWORD __fastcall SendHook(void* thisPTR, void* dummy , CDataStore* dataStore, void* param2)
 {
     // dumps the packet
-    DumpPacket(CMSG, 0, 4, dataStore);
+    DumpPacket(CMSG, (DWORD)param2, 4, dataStore);
 
     // unhooks the send function
     HookManager::UnHook(sendAddress, defaultMachineCodeSend);
@@ -273,7 +273,7 @@ DWORD __fastcall RecvHook4(void* thisPTR, void* dummy, void* param1, CDataStore*
 {
     WORD opcodeSize = buildNumber <= WOW_MOP_16135 ? 2 : 4;
     // packet dump
-    DumpPacket(SMSG, 0, opcodeSize, dataStore);
+    DumpPacket(SMSG, (DWORD)param3, opcodeSize, dataStore);
 
     // unhooks the recv function
     HookManager::UnHook(recvAddress, defaultMachineCodeRecv);
@@ -296,7 +296,7 @@ DWORD __fastcall RecvHook4(void* thisPTR, void* dummy, void* param1, CDataStore*
 DWORD __fastcall RecvHook5(void* thisPTR, void* dummy, void* param1, void* param2, CDataStore* dataStore, void* param4)
 {
     // packet dump
-    DumpPacket(SMSG, 0, 4, dataStore);
+    DumpPacket(SMSG, (DWORD)param4, 4, dataStore);
 
     // unhooks the recv function
     HookManager::UnHook(recvAddress, defaultMachineCodeRecv);
