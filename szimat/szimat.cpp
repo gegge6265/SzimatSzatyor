@@ -149,6 +149,9 @@ void DumpPacket(DWORD packetType, DWORD connectionId, WORD opcodeSize, CDataStor
     // gets the time
     time_t rawTime;
     time(&rawTime);
+
+    DWORD tickCount = GetTickCount();
+
     DWORD optionalHeaderLength = 0;
 
     if (!fileDump)
@@ -177,7 +180,6 @@ void DumpPacket(DWORD packetType, DWORD connectionId, WORD opcodeSize, CDataStor
 
         WORD pkt_version    = PKT_VERSION;
         BYTE sniffer_id     = SNIFFER_ID;
-        DWORD tickCount     = GetTickCount();
         BYTE sessionKey[40] = { 0 };
 
         fileDump = fopen(fullFileName, "wb");
@@ -204,7 +206,7 @@ void DumpPacket(DWORD packetType, DWORD connectionId, WORD opcodeSize, CDataStor
 
     fwrite((DWORD*)&packetType,             4, 1, fileDump);  // direction of the packet
     fwrite((DWORD*)&connectionId,           4, 1, fileDump);  // connection id
-    fwrite((DWORD*)&rawTime,                4, 1, fileDump);  // timestamp of the packet
+    fwrite((DWORD*)&tickCount,              4, 1, fileDump);  // timestamp of the packet
     fwrite((DWORD*)&optionalHeaderLength,   4, 1, fileDump);  // connection id
     fwrite((DWORD*)&dataStore->size,        4, 1, fileDump);  // size of the packet + opcode lenght
     fwrite((DWORD*)&packetOpcode,           4, 1, fileDump);  // opcode
