@@ -38,11 +38,13 @@ typedef struct {
 // every different client version should has different offsets
 typedef struct {
     // offset of NetClient::Send2 to sniff client packets
-    DWORD send_2;
+    DWORD send;
     // offset of NetClient::ProcessMessage to sniff server packets
-    DWORD recive;
+    DWORD recv;
     // offset of client locale "xxXX"
-    DWORD locale;
+    DWORD lang;
+    //
+    bool IsEmpty() { return send == 0 || recv == 0; }
 } HookEntry;
 
 // returns the build number of the client
@@ -137,23 +139,17 @@ bool GetOffsets(const HINSTANCE moduleHandle, const WORD build, HookEntry* entry
         printf("ERROR: File \"%s\" does not exist.\n", fileName);
         printf("\noffsets.ini template:\n");
         printf("[build]\n");
-        printf("send_2=0xDEADBEEF\n");
-        printf("recive=0xDEADBEEF\n");
-        printf("locale=0xDEADBEEF\n\n");
+        printf("send=0xDEADBEEF\n");
+        printf("recv=0xDEADBEEF\n");
+        printf("lang=0xDEADBEEF\n\n");
         return false;
     }
 
-    GetPrivateProfileString(section, "send_2", "0", ret, 20, fileName);
-    entry->send_2 = strtol(ret, 0, 0);
+    entry->send = GetPrivateProfileInt(section, "send", 0, fileName);
+    entry->recv = GetPrivateProfileInt(section, "recv", 0, fileName);
+    entry->lang = GetPrivateProfileInt(section, "lang", 0, fileName);
 
-    GetPrivateProfileString(section, "recive", "0", ret, 20, fileName);
-    entry->recive = strtol(ret, 0, 0);
-
-    // optional
-    GetPrivateProfileString(section, "locale", "0", ret, 20, fileName);
-    entry->locale = strtol(ret, 0, 0);
-
-    return entry->recive != 0 && entry->send_2 != 0;
+    return !entry->IsEmpty();
 }
 
 // returns true if hook entry exists for this specified build number

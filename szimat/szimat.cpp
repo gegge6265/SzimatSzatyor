@@ -83,7 +83,7 @@ DWORD MainThreadControl(LPVOID /* param */)
     // get the base address of the current process
     DWORD baseAddress = (DWORD)GetModuleHandle(NULL);
 
-    DWORD localeAddress = hookEntry.locale;
+    DWORD localeAddress = hookEntry.lang;
     // locale stored in reversed string (enGB as BGne...)
     if (localeAddress)
     {
@@ -104,13 +104,13 @@ DWORD MainThreadControl(LPVOID /* param */)
     printf("\nDLL path: %s\n", dllPath);
 
     // gets address of NetClient::Send2
-    sendAddress = baseAddress + hookEntry.send_2;
+    sendAddress = baseAddress + hookEntry.send;
     // hooks client's send function
     HookManager::Hook(sendAddress, (DWORD)SendHook, machineCodeHookSend, defaultMachineCodeSend);
     printf("Send is hooked.\n");
 
     // gets address of NetClient::ProcessMessage
-    recvAddress = baseAddress + hookEntry.recive;
+    recvAddress = baseAddress + hookEntry.recv;
     // hooks client's recv function
 
     if (buildNumber < 8606)
