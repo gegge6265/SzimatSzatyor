@@ -25,12 +25,7 @@
 // default name of the process which will be hooked
 const char* lookingProcessName = "Wow.exe";
 // this DLL will be injected
-const char injectDLLName[] = "szimat.dll";
-
-// this module contains function loadDLLFunctionName
-const char loadedModuleName[] = "kernel32.dll";
-// basically this function loads/injects the DLL
-const char loadDLLFunctionName[] = "LoadLibraryA";
+const char* injectDLLName = "szimat.dll";
 
 // list container which stores PIDs
 typedef std::list<DWORD /* PID */> PIDList;
@@ -55,18 +50,20 @@ int main(int argc, char* argv[])
     printf("Welcome to SzimatSzatyor, a WoW injector sniffer.\n");
     printf("SzimatSzatyor is distributed under the GNU GPLv3 license.\n");
     printf("Source code is available at: ");
-    printf("http://github.com/Anubisss/SzimatSzatyor\n\n");
+    printf("http://github.com/Konctantin/SzimatSzatyor\n\n");
 
-    if (argc > 2)
+    if (argc > 3)
     {
         printf("ERROR: Invalid parameters. ");
-        printf("\"szatyor.exe [wow_exe_name]\" should be used.\n\n");
+        printf("\"szatyor.exe [wow_exe_name] [dll_name]\" should be used.\n\n");
         system("pause");
         return 0;
     }
     // custom process' name
-    else if (argc == 2)
+    else if (argc > 1)
         lookingProcessName = argv[1];
+    else if (argc > 2)
+        injectDLLName = argv[2];
 
     // this process will be injected
     DWORD processID = 0;
@@ -191,9 +188,14 @@ int main(int argc, char* argv[])
     printf("DLL: %s\n", dllPath);
 
     if (InjectDLL(processID, dllPath))
+    {
         printf("\nInjection of '%s' is successful.\n\n", injectDLLName);
+    }
     else
+    {
         printf("\nInjection of '%s' is NOT successful.\n\n", injectDLLName);
+        system("pause");
+    }
 
     delete[] dllPath;
 
@@ -375,20 +377,20 @@ bool InjectDLL(DWORD processID, const char* dllLocation)
 {
     // gets a module handler which loaded by the process which
     // should be injected
-    HMODULE hModule = GetModuleHandle(loadedModuleName);
+    HMODULE hModule = GetModuleHandle("kernel32.dll");
     if (!hModule)
     {
-        printf("ERROR: Can't get %s's handle, ");
-        printf("ErrorCode: %u\n", loadedModuleName, GetLastError());
+        printf("ERROR: Can't get 'kernel32.dll' handle, ");
+        printf("ErrorCode: %u\n", GetLastError());
         return false;
     }
 
     // gets the address of an exported function which can load DLLs
-    FARPROC loadLibraryAddress = GetProcAddress(hModule, loadDLLFunctionName);
+    FARPROC loadLibraryAddress = GetProcAddress(hModule, "LoadLibraryA");
     if (!loadLibraryAddress)
     {
-        printf("ERROR: Can't get function %s's address, ");
-        printf("ErrorCode: %u\n", loadDLLFunctionName, GetLastError());
+        printf("ERROR: Can't get function 'LoadLibraryA' address, ");
+        printf("ErrorCode: %u\n", GetLastError());
         return false;
     }
 
@@ -413,11 +415,11 @@ bool InjectDLL(DWORD processID, const char* dllLocation)
     printf("Detected build number: %hu\n", buildNumber);
 
     // checks this build is supported or not
-    if (!IsHookEntryExists(NULL, buildNumber))
+    HookEntry hookEntry;
+    if (!GetOffsets(NULL, buildNumber, &hookEntry))
     {
         printf("ERROR: This build number is not supported.\n");
         CloseHandle(hProcess);
-        system("pause");
         return false;
     }
 

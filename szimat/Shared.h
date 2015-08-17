@@ -145,11 +145,3 @@ bool GetOffsets(const HINSTANCE moduleHandle, const WORD build, HookEntry* entry
 
     return !entry->IsEmpty();
 }
-
-// returns true if hook entry exists for this specified build number
-// otherwise false
-bool IsHookEntryExists(const HINSTANCE moduleHandle, WORD buildNumber)
-{
-    HookEntry entry;
-    return GetOffsets(moduleHandle, buildNumber, &entry);
-}

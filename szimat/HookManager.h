@@ -38,22 +38,22 @@ public:
     // the WoW contains this function
     // hookFunctionAddress - this is the user defined "callback" function
     // which will be called on hook
-    static void Hook(DWORD hookedFunctionAddress, DWORD hookFunctionAddress, BYTE* hookMachineCode, BYTE* defaultMachineCode)
+    static void Hook(DWORD_PTR hookedFunctionAddress, DWORD_PTR hookFunctionAddress, BYTE* hookMachineCode, BYTE* defaultMachineCode)
     {
+        // calculates the displacement
+        DWORD_PTR jmpDisplacement = hookFunctionAddress - hookedFunctionAddress - JMP_INSTRUCTION_SIZE;
+
         // be nice and nulls the displacement
         memset(&jumpMachineCode[1], 0x00, 4);
-
         // copies the "default" (no displacement yet) instruction
         memcpy(hookMachineCode, jumpMachineCode, JMP_INSTRUCTION_SIZE);
-        // calculates the displacement
-        DWORD jmpDisplacement = hookFunctionAddress - hookedFunctionAddress - JMP_INSTRUCTION_SIZE;
         // copies the calculated value of the displacement
         memcpy(&hookMachineCode[1], &jmpDisplacement, 4);
 
         WriteBlock(hookedFunctionAddress, hookMachineCode, defaultMachineCode);
     }
 
-    static void WriteBlock(DWORD address, BYTE* buffer, BYTE* defaulBuffer = NULL)
+    static void WriteBlock(DWORD_PTR address, BYTE* buffer, BYTE* defaulBuffer = NULL)
     {
         // stores the old protection
         DWORD oldProtect;
