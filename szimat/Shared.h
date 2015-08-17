@@ -44,7 +44,7 @@ typedef struct {
     // offset of client locale "xxXX"
     DWORD lang;
     //
-    bool IsEmpty() { return send == 0 || recv == 0; }
+    bool IsEmpty() { return send == NULL || recv == NULL; }
 } HookEntry;
 
 // returns the build number of the client
@@ -65,15 +65,10 @@ WORD GetBuildNumberFromProcess(HANDLE hProcess = NULL)
     char processExePath[MAX_PATH];
 
     // size of the path
-    DWORD processExePathSize = 0;
-    // gets the path of the current process' executable
-    // param process should be NULL in the sniffer
-    if (!hProcess)
-        processExePathSize = GetModuleFileName(NULL, processExePath, MAX_PATH);
-    // gets the path of an external process' executable
-    // param process should NOT be NULL in the injector
-    else
-        processExePathSize = GetModuleFileNameEx(hProcess, NULL, processExePath, MAX_PATH);
+    DWORD processExePathSize = hProcess
+        ? GetModuleFileNameEx(hProcess, NULL, processExePath, MAX_PATH)
+        : GetModuleFileName(NULL, processExePath, MAX_PATH);
+
     if (!processExePathSize)
     {
         printf("ERROR: Can't get path of the process' exe, ErrorCode: %u\n", GetLastError());
@@ -122,7 +117,6 @@ WORD GetBuildNumberFromProcess(HANDLE hProcess = NULL)
 // return the HookEntry from current build
 bool GetOffsets(const HINSTANCE moduleHandle, const WORD build, HookEntry* entry)
 {
-    char ret[20];
     char fileName[MAX_PATH];
     char dllPath[MAX_PATH];
     char section[6];

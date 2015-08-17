@@ -50,66 +50,27 @@ public:
         // copies the calculated value of the displacement
         memcpy(&hookMachineCode[1], &jmpDisplacement, 4);
 
-        // stores the previous access protection
-        DWORD oldProtect;
-        // changes the protection on a region of committed pages in
-        // the virtual address space of the calling process
-        // so now we can surely read/write the memory region where
-        // the hookedFunctionAddress is
-        VirtualProtect((LPVOID)hookedFunctionAddress, JMP_INSTRUCTION_SIZE, PAGE_EXECUTE_READWRITE, &oldProtect);
-
-        // just dumps the default machine code in the address
-        // so later the sniffer can restore it
-        memcpy(defaultMachineCode, (LPVOID)hookedFunctionAddress, JMP_INSTRUCTION_SIZE);
-
-        // now just writes the new generated machine code to the address
-        memcpy((LPVOID)hookedFunctionAddress, hookMachineCode, JMP_INSTRUCTION_SIZE);
-
-        // flushes the instruction cache
-        // Applications should call this if they modify code in memory.
-        // Without this, the CPU can't detect the change and
-        // _may_ execute the old code it cached.
-        FlushInstructionCache(GetCurrentProcess(), (LPVOID)hookedFunctionAddress, JMP_INSTRUCTION_SIZE);
-
-        // restores the stored access protection
-        VirtualProtect((LPVOID)hookedFunctionAddress, JMP_INSTRUCTION_SIZE, oldProtect, NULL);
+        WriteBlock(hookedFunctionAddress, hookMachineCode, defaultMachineCode);
     }
 
-    // restores the original machine code
-    static void UnHook(DWORD hookedFunctionAddress, BYTE* defaultMachineCode)
+    static void WriteBlock(DWORD address, BYTE* buffer, BYTE* defaulBuffer = NULL)
     {
         // stores the old protection
         DWORD oldProtect;
 
         // changes the protection and gets the old one
-        VirtualProtect((LPVOID)hookedFunctionAddress, JMP_INSTRUCTION_SIZE, PAGE_EXECUTE_READWRITE, &oldProtect);
+        VirtualProtect((LPVOID)address, JMP_INSTRUCTION_SIZE, PAGE_EXECUTE_READWRITE, &oldProtect);
+
+        if (defaulBuffer != NULL)
+            memcpy(defaulBuffer, (LPVOID)address, JMP_INSTRUCTION_SIZE);
 
         // writes the original machine code to the address
-        memcpy((LPVOID)hookedFunctionAddress, defaultMachineCode, JMP_INSTRUCTION_SIZE);
+        memcpy((LPVOID)address, buffer, JMP_INSTRUCTION_SIZE);
 
         // flushes the cache
-        FlushInstructionCache(GetCurrentProcess(), (LPVOID)hookedFunctionAddress, JMP_INSTRUCTION_SIZE);
+        FlushInstructionCache(GetCurrentProcess(), (LPVOID)address, JMP_INSTRUCTION_SIZE);
 
         // restores the old protection
-        VirtualProtect((LPVOID)hookedFunctionAddress, JMP_INSTRUCTION_SIZE, oldProtect, NULL);
-    }
-
-    // restores the hook
-    static void ReHook(DWORD hookedFunctionAddress, BYTE* hookMachineCode)
-    {
-        // stores the previous access protection
-        DWORD oldProtect;
-
-        // changes the protection and retrieves the previous one
-        VirtualProtect((LPVOID)hookedFunctionAddress, JMP_INSTRUCTION_SIZE, PAGE_EXECUTE_READWRITE, &oldProtect);
-
-        // writes the "hook machine code" to the address
-        memcpy((LPVOID)hookedFunctionAddress, hookMachineCode, JMP_INSTRUCTION_SIZE);
-
-        // flushes CPU's cache
-        FlushInstructionCache(GetCurrentProcess(), (LPVOID)hookedFunctionAddress, JMP_INSTRUCTION_SIZE);
-
-        // restores the previous one
-        VirtualProtect((LPVOID)hookedFunctionAddress, JMP_INSTRUCTION_SIZE, oldProtect, NULL);
+        VirtualProtect((LPVOID)address, JMP_INSTRUCTION_SIZE, oldProtect, NULL);
     }
 };

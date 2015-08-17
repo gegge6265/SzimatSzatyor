@@ -417,6 +417,7 @@ bool InjectDLL(DWORD processID, const char* dllLocation)
     {
         printf("ERROR: This build number is not supported.\n");
         CloseHandle(hProcess);
+        system("pause");
         return false;
     }
 
