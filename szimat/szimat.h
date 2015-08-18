@@ -65,13 +65,15 @@ BYTE machineCodeHookSend[JMP_INSTRUCTION_SIZE] = { 0 };
 BYTE defaultMachineCodeSend[JMP_INSTRUCTION_SIZE] = { 0 };
 
 // this function will be called when recv called in the client
-DWORD __fastcall RecvHook3(void* thisPTR, void* dummy, void* param1, CDataStore* dataStore);
-DWORD __fastcall RecvHook4(void* thisPTR, void* dummy, void* param1, CDataStore* dataStore, void* param3);
-DWORD __fastcall RecvHook5(void* thisPTR, void* dummy, void* param1, void* param2, CDataStore* dataStore, void* param4);
+DWORD __fastcall RecvHook(void* thisPTR, void* dummy, void* param1, CDataStore* dataStore);
+DWORD __fastcall RecvHook_TBC(void* thisPTR, void* dummy, void* param1, CDataStore* dataStore, void* param3);
+DWORD __fastcall RecvHook_MOP(void* thisPTR, void* dummy, void* param1, CDataStore* dataStore, void* param3);
+DWORD __fastcall RecvHook_WOD(void* thisPTR, void* dummy, void* param1, void* param2, CDataStore* dataStore, void* param4);
 
-typedef DWORD(__thiscall *RecvProto3)(void*, void*, void*);
-typedef DWORD(__thiscall *RecvProto4)(void*, void*, void*, void*);
-typedef DWORD(__thiscall *RecvProto5)(void*, void*, void*, void*, void*);
+typedef DWORD(__thiscall *RecvProto)(void*, void*, void*);
+typedef DWORD(__thiscall *RecvProto_TBC)(void*, void*, void*, void*);
+typedef DWORD(__thiscall *RecvProto_MOP)(void*, void*, void*, void*);
+typedef DWORD(__thiscall *RecvProto_WOD)(void*, void*, void*, void*, void*);
 
 // address of WoW's recv function
 DWORD recvAddress = 0;
@@ -93,3 +95,16 @@ DWORD MainThreadControl(LPVOID /* param */);
 
 char dllPath[MAX_PATH] = { 0 };
 FILE* fileDump = 0;
+
+
+typedef struct {
+    WORD build;
+    DWORD_PTR proc;
+} ProtoEntry;
+
+const ProtoEntry RecvProtoTable[] = {
+    { 8606,   (DWORD_PTR)RecvHook     },
+    { 16135,  (DWORD_PTR)RecvHook_TBC },
+    { 18443,  (DWORD_PTR)RecvHook_MOP },
+    { 0xFFFF, (DWORD_PTR)RecvHook_WOD },
+};
