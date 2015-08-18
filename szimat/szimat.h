@@ -51,13 +51,13 @@ HookEntry hookEntry;
 // fastcall convention means that the first 2 parameters is passed
 // via ECX and EDX registers so the first param will be the this pointer and
 // the second one is just a dummy (not used)
-DWORD __fastcall SendHook(void* thisPTR, void*, CDataStore*, void*);
+DWORD __fastcall SendHook(void* thisPTR, void*, CDataStore*, DWORD);
 
 typedef DWORD(__thiscall *SendProto)(void*, void*, void*);
 
 // address of WoW's send function
 DWORD sendAddress = 0;
-// global storage for the "the hooking" machine code which 
+// global storage for the "the hooking" machine code which
 // hooks client's send function
 BYTE machineCodeHookSend[JMP_INSTRUCTION_SIZE] = { 0 };
 // global storage which stores the

@@ -222,17 +222,17 @@ void DumpPacket(DWORD packetType, DWORD connectionId, WORD opcodeSize, CDataStor
     mtx.unlock();
 }
 
-DWORD __fastcall SendHook(void* thisPTR, void* dummy , CDataStore* dataStore, void* param2)
+DWORD __fastcall SendHook(void* thisPTR, void* dummy , CDataStore* dataStore, DWORD connectionId)
 {
     // dumps the packet
-    DumpPacket(CMSG, (DWORD)param2, 4, dataStore);
+    DumpPacket(CMSG, connectionId, 4, dataStore);
 
     // unhooks the send function
     HookManager::WriteBlock(sendAddress, defaultMachineCodeSend);
 
     // now let's call client's function
     // so it can send the packet to the server (connection, CDataStore*, 2)
-    DWORD returnValue = SendProto(sendAddress)(thisPTR, dataStore, param2);
+    DWORD returnValue = SendProto(sendAddress)(thisPTR, dataStore, (void*)connectionId);
 
     // hooks again to catch the next outgoing packets also
     HookManager::WriteBlock(sendAddress, machineCodeHookSend);
