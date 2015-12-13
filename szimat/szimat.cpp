@@ -62,18 +62,26 @@ DWORD MainThreadControl(LPVOID /* param */)
     printf("restarting the WoW.\n\n");
 
     // gets the build number
-    buildNumber = GetBuildNumberFromProcess();
+    wowVersion = GetBuildNumberFromProcess();
     // error occured
-    if (!buildNumber)
+    if (!wowVersion.build)
     {
         printf("Can't determine build number.\n\n");
         system("pause");
         FreeLibraryAndExitThread((HMODULE)instanceDLL, 0);
     }
-    printf("Detected build number: %hu\n", buildNumber);
+
+    if (wowVersion.expansion >= sizeof(ProtoTable))
+    {
+        printf("\nERROR: Unsupported expansion (%u) ", wowVersion.expansion);
+        system("pause");
+        FreeLibraryAndExitThread((HMODULE)instanceDLL, 0);
+    }
+
+    printf("Detected build number: %hu expansion: %hu\n", wowVersion.build, wowVersion.expansion);
 
     // checks this build is supported or not
-    if (!GetOffsets(instanceDLL, buildNumber, &hookEntry))
+    if (!GetOffsets(instanceDLL, wowVersion.build, &hookEntry))
     {
         printf("ERROR: This build number is not supported.\n\n");
         system("pause");
@@ -103,25 +111,23 @@ DWORD MainThreadControl(LPVOID /* param */)
     }
     printf("\nDLL path: %s\n", dllPath);
 
-    // gets address of NetClient::Send2
-    sendAddress = baseAddress + hookEntry.send;
-    // hooks client's send function
-    HookManager::Hook(sendAddress, (DWORD_PTR)SendHook, machineCodeHookSend, defaultMachineCodeSend);
-    printf("Send is hooked.\n");
-
-    // gets address of NetClient::ProcessMessage
-    recvAddress = baseAddress + hookEntry.recv;
-
-    // hooks client's recv function
-    for each (auto rec in RecvProtoTable)
+    auto proto = ProtoTable[wowVersion.expansion];
+    if (!proto.send || !proto.recv)
     {
-        if (rec.build > buildNumber)
-        {
-            HookManager::Hook(recvAddress, rec.proc, machineCodeHookRecv, defaultMachineCodeRecv);
-            break;
-        }
+        printf("\nERROR: Unsupported expansion (%u) ", wowVersion.expansion);
+        system("pause");
+        FreeLibraryAndExitThread((HMODULE)instanceDLL, 0);
     }
 
+    printf("Found '%s' hooks!\n", proto.name);
+
+    sendAddress = baseAddress + hookEntry.send;
+    recvAddress = baseAddress + hookEntry.recv;
+
+    HookManager::Hook(sendAddress, (DWORD_PTR)proto.send, machineCodeHookSend, defaultMachineCodeSend);
+    printf("Send is hooked.\n");
+
+    HookManager::Hook(recvAddress, (DWORD_PTR)proto.recv, machineCodeHookRecv, defaultMachineCodeRecv);
     printf("Recv is hooked.\n");
 
     // loops until SIGINT (CTRL-C) occurs
@@ -159,8 +165,8 @@ void DumpPacket(DWORD packetType, DWORD connectionId, WORD opcodeSize, CDataStor
         PathRemoveFileSpec(dllPath);
         // fills the basic file name format
         _snprintf(fileName, MAX_PATH,
-            "wowsniff_%s_%u_%d-%02d-%02d_%02d-%02d-%02d.pkt",
-            locale, buildNumber,
+            "wowsniff_%s_%u_%u_%d-%02d-%02d_%02d-%02d-%02d.pkt",
+            locale, wowVersion.expansion, wowVersion.build,
             date->tm_year + 1900,
             date->tm_mon + 1,
             date->tm_mday,
@@ -183,7 +189,7 @@ void DumpPacket(DWORD packetType, DWORD connectionId, WORD opcodeSize, CDataStor
         fwrite("PKT",                           3, 1, fileDump);  // magic
         fwrite((WORD*)&pkt_version,             2, 1, fileDump);  // major.minor version
         fwrite((BYTE*)&sniffer_id,              1, 1, fileDump);  // sniffer id
-        fwrite((DWORD*)&buildNumber,            4, 1, fileDump);  // client build
+        fwrite((DWORD*)&wowVersion.build,       4, 1, fileDump);  // client build
         fwrite(locale,                          4, 1, fileDump);  // client lang
         fwrite(sessionKey,                     40, 1, fileDump);  // session key
         fwrite((DWORD*)&rawTime,                4, 1, fileDump);  // started time

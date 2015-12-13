@@ -41,7 +41,7 @@ HINSTANCE instanceDLL = NULL;
 volatile bool isSigIntOccured = false;
 
 // global access to the build number
-WORD buildNumber = 0;
+VerInfo wowVersion = { };
 char locale[5] = { 'x', 'x', 'X', 'X', '\0' };
 HookEntry hookEntry;
 
@@ -98,13 +98,18 @@ FILE* fileDump = 0;
 
 
 typedef struct {
-    WORD build;
-    DWORD_PTR proc;
+    LPVOID send;
+    LPVOID recv;
+    char* name;
 } ProtoEntry;
 
-const ProtoEntry RecvProtoTable[] = {
-    { 8606,   (DWORD_PTR)RecvHook     },
-    { 16135,  (DWORD_PTR)RecvHook_TBC },
-    { 18443,  (DWORD_PTR)RecvHook_MOP },
-    { 0xFFFF, (DWORD_PTR)RecvHook_WOD },
+const ProtoEntry ProtoTable[] = {
+    /* 0 */ {     NULL,         NULL, "Aplha"     },
+    /* 1 */ { SendHook, RecvHook    , "Vanilla"   },
+    /* 2 */ { SendHook, RecvHook_TBC, "TBC"       },
+    /* 3 */ { SendHook, RecvHook_TBC, "WotLK"     },
+    /* 4 */ { SendHook, RecvHook_TBC, "Cataclysm" },
+    /* 5 */ { SendHook, RecvHook_MOP, "MOP"       },
+    /* 6 */ { SendHook, RecvHook_WOD, "WOD"       },
+    /* 7 */ { NULL    ,         NULL, "Legion"    },
 };

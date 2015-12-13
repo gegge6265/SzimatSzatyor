@@ -404,19 +404,19 @@ bool InjectDLL(DWORD processID, const char* dllLocation)
     printf("\nProcess [%u] '%s' is opened.\n", processID, lookingProcessName);
 
     // gets the build number
-    WORD buildNumber = GetBuildNumberFromProcess(hProcess);
+    auto wowInfo = GetBuildNumberFromProcess(hProcess);
     // error occured
-    if (!buildNumber)
+    if (!wowInfo.build)
     {
         printf("Can't determine build number.\n");
         CloseHandle(hProcess);
         return false;
     }
-    printf("Detected build number: %hu\n", buildNumber);
+    printf("Detected build number: %hu\n", wowInfo.build);
 
     // checks this build is supported or not
     HookEntry hookEntry;
-    if (!GetOffsets(NULL, buildNumber, &hookEntry))
+    if (!GetOffsets(NULL, wowInfo.build, &hookEntry))
     {
         printf("ERROR: This build number is not supported.\n");
         CloseHandle(hProcess);

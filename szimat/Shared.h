@@ -33,6 +33,11 @@ typedef struct {
     DWORD read;
 } CDataStore;
 
+typedef struct {
+    WORD build;
+    WORD expansion;
+} VerInfo;
+
 // hook entry structure
 // stores the offsets which are will be hooked
 // every different client version should has different offsets
@@ -59,7 +64,7 @@ typedef struct {
 // param should NOT be NULL when would like to get the
 // path of an _external_ process' executable
 // so in the injector the param should contain the handle of a WoW process
-WORD GetBuildNumberFromProcess(HANDLE hProcess = NULL)
+VerInfo GetBuildNumberFromProcess(HANDLE hProcess = NULL)
 {
     // will contain where the process is which will be injected
     char processExePath[MAX_PATH];
@@ -72,7 +77,7 @@ WORD GetBuildNumberFromProcess(HANDLE hProcess = NULL)
     if (!processExePathSize)
     {
         printf("ERROR: Can't get path of the process' exe, ErrorCode: %u\n", GetLastError());
-        return 0;
+        return{ NULL, NULL };
     }
     printf("ExePath: %s\n", processExePath);
 
@@ -82,7 +87,7 @@ WORD GetBuildNumberFromProcess(HANDLE hProcess = NULL)
     {
         printf("ERROR: Can't get size of the file version info,");
         printf("ErrorCode: %u\n", GetLastError());
-        return 0;
+        return{ NULL, NULL };
     }
 
     // allocates memory for file version info
@@ -92,7 +97,7 @@ WORD GetBuildNumberFromProcess(HANDLE hProcess = NULL)
     {
         printf("ERROR: Can't get file version info, ErrorCode: %u\n", GetLastError());
         delete[] fileVersionInfoBuffer;
-        return 0;
+        return{ NULL, NULL };
     }
 
     // structure of file version info
@@ -105,13 +110,14 @@ WORD GetBuildNumberFromProcess(HANDLE hProcess = NULL)
     {
         printf("ERROR: File version info query is failed.\n");
         delete[] fileVersionInfoBuffer;
-        return 0;
+        return{ NULL, NULL };
     }
 
-    // last (low) 2 bytes
-    WORD buildNumber = fileInfo->dwFileVersionLS & 0xFFFF;
+    WORD build = fileInfo->dwFileVersionLS & 0xFFFF;
+    WORD expansion = (fileInfo->dwFileVersionMS >> 16) & 0xFFFF;
+
     delete[] fileVersionInfoBuffer;
-    return buildNumber;
+    return{ build, expansion };
 }
 
 // return the HookEntry from current build
