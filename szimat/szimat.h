@@ -41,7 +41,7 @@ HINSTANCE instanceDLL = NULL;
 volatile bool isSigIntOccured = false;
 
 // global access to the build number
-VerInfo wowVersion = { };
+VerInfo verInfo = { };
 char locale[5] = { 'x', 'x', 'X', 'X', '\0' };
 HookEntry hookEntry;
 
@@ -104,12 +104,12 @@ typedef struct {
 } ProtoEntry;
 
 const ProtoEntry ProtoTable[] = {
-    /* 0 */ {     NULL,         NULL, "Aplha"     },
+    /* 0 */ { NULL    , NULL        , "Aplha"     },
     /* 1 */ { SendHook, RecvHook    , "Vanilla"   },
     /* 2 */ { SendHook, RecvHook_TBC, "TBC"       },
     /* 3 */ { SendHook, RecvHook_TBC, "WotLK"     },
     /* 4 */ { SendHook, RecvHook_TBC, "Cataclysm" },
     /* 5 */ { SendHook, RecvHook_MOP, "MOP"       },
     /* 6 */ { SendHook, RecvHook_WOD, "WOD"       },
-    /* 7 */ { NULL    ,         NULL, "Legion"    },
+    /* 7 */ { NULL    , NULL        , "Legion"    },
 };

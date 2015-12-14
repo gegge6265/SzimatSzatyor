@@ -62,26 +62,26 @@ DWORD MainThreadControl(LPVOID /* param */)
     printf("restarting the WoW.\n\n");
 
     // gets the build number
-    wowVersion = GetBuildNumberFromProcess();
+    verInfo = GetVerInfoFromProcess();
     // error occured
-    if (!wowVersion.build)
+    if (!verInfo.build)
     {
         printf("Can't determine build number.\n\n");
         system("pause");
         FreeLibraryAndExitThread((HMODULE)instanceDLL, 0);
     }
 
-    if (wowVersion.expansion >= sizeof(ProtoTable))
+    if (verInfo.expansion >= sizeof(ProtoTable))
     {
-        printf("\nERROR: Unsupported expansion (%u) ", wowVersion.expansion);
+        printf("\nERROR: Unsupported expansion (%u) ", verInfo.expansion);
         system("pause");
         FreeLibraryAndExitThread((HMODULE)instanceDLL, 0);
     }
 
-    printf("Detected build number: %hu expansion: %hu\n", wowVersion.build, wowVersion.expansion);
+    printf("Detected build number: %hu expansion: %hu\n", verInfo.build, verInfo.expansion);
 
     // checks this build is supported or not
-    if (!GetOffsets(instanceDLL, wowVersion.build, &hookEntry))
+    if (!GetOffsets(instanceDLL, verInfo.build, &hookEntry))
     {
         printf("ERROR: This build number is not supported.\n\n");
         system("pause");
@@ -111,10 +111,10 @@ DWORD MainThreadControl(LPVOID /* param */)
     }
     printf("\nDLL path: %s\n", dllPath);
 
-    auto proto = ProtoTable[wowVersion.expansion];
+    auto proto = ProtoTable[verInfo.expansion];
     if (!proto.send || !proto.recv)
     {
-        printf("\nERROR: Unsupported expansion (%u) ", wowVersion.expansion);
+        printf("\nERROR: Unsupported expansion (%u) ", verInfo.expansion);
         system("pause");
         FreeLibraryAndExitThread((HMODULE)instanceDLL, 0);
     }
@@ -166,7 +166,7 @@ void DumpPacket(DWORD packetType, DWORD connectionId, WORD opcodeSize, CDataStor
         // fills the basic file name format
         _snprintf(fileName, MAX_PATH,
             "wowsniff_%s_%u_%u_%d-%02d-%02d_%02d-%02d-%02d.pkt",
-            locale, wowVersion.expansion, wowVersion.build,
+            locale, verInfo.expansion, verInfo.build,
             date->tm_year + 1900,
             date->tm_mon + 1,
             date->tm_mday,
@@ -189,7 +189,7 @@ void DumpPacket(DWORD packetType, DWORD connectionId, WORD opcodeSize, CDataStor
         fwrite("PKT",                           3, 1, fileDump);  // magic
         fwrite((WORD*)&pkt_version,             2, 1, fileDump);  // major.minor version
         fwrite((BYTE*)&sniffer_id,              1, 1, fileDump);  // sniffer id
-        fwrite((DWORD*)&wowVersion.build,       4, 1, fileDump);  // client build
+        fwrite((DWORD*)&verInfo.build,          4, 1, fileDump);  // client build
         fwrite(locale,                          4, 1, fileDump);  // client lang
         fwrite(sessionKey,                     40, 1, fileDump);  // session key
         fwrite((DWORD*)&rawTime,                4, 1, fileDump);  // started time

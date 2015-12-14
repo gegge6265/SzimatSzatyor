@@ -64,7 +64,7 @@ typedef struct {
 // param should NOT be NULL when would like to get the
 // path of an _external_ process' executable
 // so in the injector the param should contain the handle of a WoW process
-VerInfo GetBuildNumberFromProcess(HANDLE hProcess = NULL)
+VerInfo GetVerInfoFromProcess(HANDLE hProcess = NULL)
 {
     // will contain where the process is which will be injected
     char processExePath[MAX_PATH];
