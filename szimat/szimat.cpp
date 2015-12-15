@@ -1,48 +1,164 @@
-/*
-* This file is part of SzimatSzatyor.
-*
-* SzimatSzatyor is free software: you can redistribute it and/or modify
-* it under the terms of the GNU General Public License as published by
-* the Free Software Foundation, either version 3 of the License, or
-* (at your option) any later version.
+#include <Windows.h>
+#include <Shlwapi.h>
+#include <cstdio>
+#include <ctime>
+#include "ConsoleManager.h"
+#include "Shared.h"
+#include <mutex>
+#include "..\minhook\include\MinHook.h"
 
-* SzimatSzatyor is distributed in the hope that it will be useful,
-* but WITHOUT ANY WARRANTY; without even the implied warranty of
-* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-* GNU General Public License for more details.
+#define PKT_VERSION 0x0301
+#define SNIFFER_ID  15
 
-* You should have received a copy of the GNU General Public License
-* along with SzimatSzatyor.  If not, see <http://www.gnu.org/licenses/>.
-*/
-#include "szimat.h"
+#define CMSG 0x47534D43 // client to server, CMSG
+#define SMSG 0x47534D53 // server to client, SMSG
 
-// entry point of the DLL
-BOOL APIENTRY DllMain(HINSTANCE instDLL, DWORD reason, LPVOID /* reserved */)
+volatile bool* ConsoleManager::_sniffingLoopCondition = NULL;
+std::mutex mtx;
+HINSTANCE instanceDLL = NULL;
+volatile bool isSigIntOccured = false;
+VerInfo verInfo = { NULL, NULL };
+char locale[5]  = { "xxXX" };
+HookEntry hookEntry;
+LPVOID sendDetour, recvDetour;
+bool sendHookGood = false, recvHookGood = false;
+char dllPath[MAX_PATH] = { NULL };
+FILE* fileDump = NULL;
+
+void DumpPacket(DWORD packetType, DWORD connectionId, WORD opcodeSize, CDataStore* dataStore)
 {
-    // called when the DLL is being loaded into the
-    // virtual address space of the current process (where to be injected)
-    if (reason == DLL_PROCESS_ATTACH)
-    {
-        instanceDLL = instDLL;
-        // disables thread notifications (DLL_THREAD_ATTACH, DLL_THREAD_DETACH)
-        DisableThreadLibraryCalls(instDLL);
+    mtx.lock();
+    // gets the time
+    time_t rawTime;
+    time(&rawTime);
 
-        // creates a thread to execute within the
-        // virtual address space of the calling process (WoW)
-        CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)&MainThreadControl, NULL, 0, NULL);
-    }
-    // the DLL is being unloaded
-    else if (reason == DLL_PROCESS_DETACH)
-    {
-        // close the dump file
-        if (fileDump)
-            fclose(fileDump);
+    DWORD tickCount = GetTickCount();
+    DWORD optionalHeaderLength = 0;
 
-        // deallocates the console
-        ConsoleManager::Destroy();
+    if (!fileDump)
+    {
+        tm* date = localtime(&rawTime);
+        // basic file name format:
+        char fileName[MAX_PATH];
+        // removes the DLL name from the path
+        PathRemoveFileSpec(dllPath);
+        // fills the basic file name format
+        _snprintf(fileName, MAX_PATH,
+            "wowsniff_%s_%u_%u_%d-%02d-%02d_%02d-%02d-%02d.pkt",
+            locale, verInfo.expansion, verInfo.build,
+            date->tm_year + 1900,
+            date->tm_mon + 1,
+            date->tm_mday,
+            date->tm_hour,
+            date->tm_min,
+            date->tm_sec);
+
+        // some info
+        printf("Sniff dump: %s\n\n", fileName);
+
+        char fullFileName[MAX_PATH];
+        _snprintf(fullFileName, MAX_PATH, "%s\\%s", dllPath, fileName);
+
+        WORD pkt_version    = PKT_VERSION;
+        BYTE sniffer_id     = SNIFFER_ID;
+        BYTE sessionKey[40] = { 0 };
+
+        fileDump = fopen(fullFileName, "wb");
+        // PKT 3.1 header
+        fwrite("PKT",                           3, 1, fileDump);  // magic
+        fwrite((WORD*)&pkt_version,             2, 1, fileDump);  // major.minor version
+        fwrite((BYTE*)&sniffer_id,              1, 1, fileDump);  // sniffer id
+        fwrite((DWORD*)&verInfo.build,          4, 1, fileDump);  // client build
+        fwrite(locale,                          4, 1, fileDump);  // client lang
+        fwrite(sessionKey,                     40, 1, fileDump);  // session key
+        fwrite((DWORD*)&rawTime,                4, 1, fileDump);  // started time
+        fwrite((DWORD*)&tickCount,              4, 1, fileDump);  // started tick's
+        fwrite((DWORD*)&optionalHeaderLength,   4, 1, fileDump);  // opional header length
+
+        fflush(fileDump);
     }
-    return TRUE;
+
+    DWORD packetOpcode = opcodeSize == 4
+        ? *(DWORD*)dataStore->buffer
+        : *(WORD*)dataStore->buffer;
+
+    BYTE* packetData     = dataStore->buffer + opcodeSize;
+    DWORD packetDataSize = dataStore->size   - opcodeSize;
+
+    fwrite((DWORD*)&packetType,             4, 1, fileDump);  // direction of the packet
+    fwrite((DWORD*)&connectionId,           4, 1, fileDump);  // connection id
+    fwrite((DWORD*)&tickCount,              4, 1, fileDump);  // timestamp of the packet
+    fwrite((DWORD*)&optionalHeaderLength,   4, 1, fileDump);  // connection id
+    fwrite((DWORD*)&dataStore->size,        4, 1, fileDump);  // size of the packet + opcode lenght
+    fwrite((DWORD*)&packetOpcode,           4, 1, fileDump);  // opcode
+
+    fwrite(packetData, packetDataSize,         1, fileDump);  // data
+
+#if _DEBUG
+    printf("%s Opcode: 0x%04X Size: %-8u\n", packetType == CMSG ? "CMSG" : "SMSG", packetOpcode, packetDataSize);
+#endif
+
+    fflush(fileDump);
+
+    mtx.unlock();
 }
+
+#define CHECK(p, m) if (!p) { printf(m); p = true; }
+
+typedef DWORD(__thiscall *SendProto)(void*, void*, void*);
+DWORD __fastcall SendHook(void* thisPTR, void* dummy , CDataStore* dataStore, DWORD connectionId)
+{
+    DumpPacket(CMSG, connectionId, 4, dataStore);
+    CHECK(sendHookGood, "Send hook is working.\n");
+    return reinterpret_cast<SendProto>(sendDetour)(thisPTR, dataStore, (LPVOID)connectionId);
+}
+
+#pragma region RecvHook
+
+typedef DWORD(__thiscall *RecvProto)(void*, void*, void*);
+DWORD __fastcall RecvHook(void* thisPTR, void* dummy, void* param1, CDataStore* dataStore)
+{
+    DumpPacket(SMSG, 0, 2, dataStore);
+    CHECK(recvHookGood, "Recv hook is working.\n");
+    return reinterpret_cast<RecvProto>(recvDetour)(thisPTR, param1, dataStore);
+}
+
+typedef DWORD(__thiscall *RecvProto_TBC)(void*, void*, void*, void*);
+DWORD __fastcall RecvHook_TBC(void* thisPTR, void* dummy, void* param1, CDataStore* dataStore, void* param3)
+{
+    DumpPacket(SMSG, (DWORD)param3, 2, dataStore);
+    CHECK(recvHookGood, "Recv hook is working.\n");
+    return reinterpret_cast<RecvProto_TBC>(recvDetour)(thisPTR, param1, dataStore, param3);
+}
+
+typedef DWORD(__thiscall *RecvProto_MOP)(void*, void*, void*, void*);
+DWORD __fastcall RecvHook_MOP(void* thisPTR, void* dummy, void* param1, CDataStore* dataStore, void* param3)
+{
+    DumpPacket(SMSG, (DWORD)param3, 4, dataStore);
+    CHECK(recvHookGood, "Recv hook is working.\n");
+    return reinterpret_cast<RecvProto_MOP>(recvDetour)(thisPTR, param1, dataStore, param3);
+}
+
+typedef DWORD(__thiscall *RecvProto_WOD)(void*, void*, void*, void*, void*);
+DWORD __fastcall RecvHook_WOD(void* thisPTR, void* dummy, void* param1, void* param2, CDataStore* dataStore, void* param4)
+{
+    DumpPacket(SMSG, (DWORD)param4, 4, dataStore);
+    CHECK(recvHookGood, "Recv hook is working.\n");
+    return reinterpret_cast<RecvProto_WOD>(recvDetour)(thisPTR, param1, param2, dataStore, param4);
+}
+
+#pragma endregion
+
+const ProtoEntry ProtoTable[] = {
+    /* 0 */{ NULL     , NULL         , "Aplha"     },
+    /* 1 */{ &SendHook, &RecvHook    , "Vanilla"   },
+    /* 2 */{ &SendHook, &RecvHook_TBC, "TBC"       },
+    /* 3 */{ &SendHook, &RecvHook_TBC, "WotLK"     },
+    /* 4 */{ &SendHook, &RecvHook_TBC, "Cataclysm" },
+    /* 5 */{ &SendHook, &RecvHook_MOP, "MOP"       },
+    /* 6 */{ &SendHook, &RecvHook_WOD, "WOD"       },
+    /* 7 */{ NULL     , NULL         , "Legion"    },
+};
 
 DWORD MainThreadControl(LPVOID /* param */)
 {
@@ -121,225 +237,52 @@ DWORD MainThreadControl(LPVOID /* param */)
 
     printf("Found '%s' hooks!\n", proto.name);
 
-    sendAddress = baseAddress + hookEntry.send;
-    recvAddress = baseAddress + hookEntry.recv;
+    MH_CreateHook((LPVOID)(baseAddress + hookEntry.send), proto.send, &sendDetour);
+    MH_CreateHook((LPVOID)(baseAddress + hookEntry.recv), proto.recv, &recvDetour);
+    printf(">> %s hook is installed.\n", proto.name);
 
-    HookManager::Hook(sendAddress, (DWORD_PTR)proto.send, machineCodeHookSend, defaultMachineCodeSend);
-    printf("Send is hooked.\n");
-
-    HookManager::Hook(recvAddress, (DWORD_PTR)proto.recv, machineCodeHookRecv, defaultMachineCodeRecv);
-    printf("Recv is hooked.\n");
+    MH_EnableHook(MH_ALL_HOOKS);
 
     // loops until SIGINT (CTRL-C) occurs
     while (!isSigIntOccured)
         Sleep(50); // sleeps 50 ms to be nice
 
-    // unhooks functions
-    HookManager::WriteBlock(sendAddress, defaultMachineCodeSend);
-    HookManager::WriteBlock(recvAddress, defaultMachineCodeRecv);
 
+    MH_DisableHook(MH_ALL_HOOKS);
+    printf("All hook disabled.\n");
     // shutdowns the sniffer
     // note: after that DLL's entry point will be called with
     // reason DLL_PROCESS_DETACH
     FreeLibraryAndExitThread((HMODULE)instanceDLL, 0);
-    return 0;
-}
-
-void DumpPacket(DWORD packetType, DWORD connectionId, WORD opcodeSize, CDataStore* dataStore)
-{
-    mtx.lock();
-    // gets the time
-    time_t rawTime;
-    time(&rawTime);
-
-    DWORD tickCount = GetTickCount();
-
-    DWORD optionalHeaderLength = 0;
-
-    if (!fileDump)
-    {
-        tm* date = localtime(&rawTime);
-        // basic file name format:
-        char fileName[MAX_PATH];
-        // removes the DLL name from the path
-        PathRemoveFileSpec(dllPath);
-        // fills the basic file name format
-        _snprintf(fileName, MAX_PATH,
-            "wowsniff_%s_%u_%u_%d-%02d-%02d_%02d-%02d-%02d.pkt",
-            locale, verInfo.expansion, verInfo.build,
-            date->tm_year + 1900,
-            date->tm_mon + 1,
-            date->tm_mday,
-            date->tm_hour,
-            date->tm_min,
-            date->tm_sec);
-
-        // some info
-        printf("Sniff dump: %s\n\n", fileName);
-
-        char fullFileName[MAX_PATH];
-        _snprintf(fullFileName, MAX_PATH, "%s\\%s", dllPath, fileName);
-
-        WORD pkt_version    = PKT_VERSION;
-        BYTE sniffer_id     = SNIFFER_ID;
-        BYTE sessionKey[40] = { 0 };
-
-        fileDump = fopen(fullFileName, "wb");
-        // PKT 3.1 header
-        fwrite("PKT",                           3, 1, fileDump);  // magic
-        fwrite((WORD*)&pkt_version,             2, 1, fileDump);  // major.minor version
-        fwrite((BYTE*)&sniffer_id,              1, 1, fileDump);  // sniffer id
-        fwrite((DWORD*)&verInfo.build,          4, 1, fileDump);  // client build
-        fwrite(locale,                          4, 1, fileDump);  // client lang
-        fwrite(sessionKey,                     40, 1, fileDump);  // session key
-        fwrite((DWORD*)&rawTime,                4, 1, fileDump);  // started time
-        fwrite((DWORD*)&tickCount,              4, 1, fileDump);  // started tick's
-        fwrite((DWORD*)&optionalHeaderLength,   4, 1, fileDump);  // opional header length
-
-        fflush(fileDump);
-    }
-
-    DWORD packetOpcode = opcodeSize == 4
-        ? *(DWORD*)dataStore->buffer
-        : *(WORD*)dataStore->buffer;
-
-    BYTE* packetData     = dataStore->buffer + opcodeSize;
-    DWORD packetDataSize = dataStore->size   - opcodeSize;
-
-    fwrite((DWORD*)&packetType,             4, 1, fileDump);  // direction of the packet
-    fwrite((DWORD*)&connectionId,           4, 1, fileDump);  // connection id
-    fwrite((DWORD*)&tickCount,              4, 1, fileDump);  // timestamp of the packet
-    fwrite((DWORD*)&optionalHeaderLength,   4, 1, fileDump);  // connection id
-    fwrite((DWORD*)&dataStore->size,        4, 1, fileDump);  // size of the packet + opcode lenght
-    fwrite((DWORD*)&packetOpcode,           4, 1, fileDump);  // opcode
-
-    fwrite(packetData, packetDataSize,         1, fileDump);  // data
-
-#if _DEBUG
-    printf("%s Opcode: 0x%04X Size: %-8u\n", packetType == CMSG ? "CMSG" : "SMSG", packetOpcode, packetDataSize);
-#endif
-
-    fflush(fileDump);
-
-    mtx.unlock();
-}
-
-DWORD __fastcall SendHook(void* thisPTR, void* dummy , CDataStore* dataStore, DWORD connectionId)
-{
-    // dumps the packet
-    DumpPacket(CMSG, connectionId, 4, dataStore);
-
-    // unhooks the send function
-    HookManager::WriteBlock(sendAddress, defaultMachineCodeSend);
-
-    // now let's call client's function
-    // so it can send the packet to the server (connection, CDataStore*, 2)
-    DWORD returnValue = SendProto(sendAddress)(thisPTR, dataStore, (void*)connectionId);
-
-    // hooks again to catch the next outgoing packets also
-    HookManager::WriteBlock(sendAddress, machineCodeHookSend);
-
-    if (!sendHookGood)
-    {
-        printf("Send hook is working.\n");
-        sendHookGood = true;
-    }
 
     return 0;
 }
 
-#pragma region RecvHook
-
-DWORD __fastcall RecvHook(void* thisPTR, void* dummy, void* param1, CDataStore* dataStore)
+BOOL APIENTRY DllMain(HINSTANCE instDLL, DWORD reason, LPVOID /* reserved */)
 {
-    // packet dump
-    DumpPacket(SMSG, 0, 2, dataStore);
-
-    // unhooks the recv function
-    HookManager::WriteBlock(recvAddress, defaultMachineCodeRecv);
-
-    // calls client's function so it can processes the packet
-    DWORD returnValue = RecvProto(recvAddress)(thisPTR, param1, dataStore);
-
-    // hooks again to catch the next incoming packets also
-    HookManager::WriteBlock(recvAddress, machineCodeHookRecv);
-
-    if (!recvHookGood)
+    // called when the DLL is being loaded into the
+    // virtual address space of the current process (where to be injected)
+    if (reason == DLL_PROCESS_ATTACH)
     {
-        printf("Recv hook Classic is working.\n");
-        recvHookGood = true;
+        instanceDLL = instDLL;
+        // disables thread notifications (DLL_THREAD_ATTACH, DLL_THREAD_DETACH)
+        DisableThreadLibraryCalls(instDLL);
+        MH_Initialize();
+
+        // creates a thread to execute within the
+        // virtual address space of the calling process (WoW)
+        CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)&MainThreadControl, NULL, 0, NULL);
     }
-
-    return returnValue;
-}
-
-DWORD __fastcall RecvHook_TBC(void* thisPTR, void* dummy, void* param1, CDataStore* dataStore, void* param3)
-{
-    // packet dump
-    DumpPacket(SMSG, (DWORD)param3, 2, dataStore);
-
-    // unhooks the recv function
-    HookManager::WriteBlock(recvAddress, defaultMachineCodeRecv);
-
-    // calls client's function so it can processes the packet
-    DWORD returnValue = RecvProto_TBC(recvAddress)(thisPTR, param1, dataStore, param3);
-
-    // hooks again to catch the next incoming packets also
-    HookManager::WriteBlock(recvAddress, machineCodeHookRecv);
-
-    if (!recvHookGood)
+    // the DLL is being unloaded
+    else if (reason == DLL_PROCESS_DETACH)
     {
-        printf("Recv hook TBC is working.\n");
-        recvHookGood = true;
+        // close the dump file
+        if (fileDump)
+            fclose(fileDump);
+
+        MH_Uninitialize();
+        // deallocates the console
+        ConsoleManager::Destroy();
     }
-
-    return returnValue;
+    return TRUE;
 }
-
-DWORD __fastcall RecvHook_MOP(void* thisPTR, void* dummy, void* param1, CDataStore* dataStore, void* param3)
-{
-    // packet dump
-    DumpPacket(SMSG, (DWORD)param3, 4, dataStore);
-
-    // unhooks the recv function
-    HookManager::WriteBlock(recvAddress, defaultMachineCodeRecv);
-
-    // calls client's function so it can processes the packet
-    DWORD returnValue = RecvProto_MOP(recvAddress)(thisPTR, param1, dataStore, param3);
-
-    // hooks again to catch the next incoming packets also
-    HookManager::WriteBlock(recvAddress, machineCodeHookRecv);
-
-    if (!recvHookGood)
-    {
-        printf("Recv hook MOP is working.\n");
-        recvHookGood = true;
-    }
-
-    return returnValue;
-}
-
-DWORD __fastcall RecvHook_WOD(void* thisPTR, void* dummy, void* param1, void* param2, CDataStore* dataStore, void* param4)
-{
-    // packet dump
-    DumpPacket(SMSG, (DWORD)param4, 4, dataStore);
-
-    // unhooks the recv function
-    HookManager::WriteBlock(recvAddress, defaultMachineCodeRecv);
-
-    // calls client's function so it can processes the packet
-    DWORD returnValue = RecvProto_WOD(recvAddress)(thisPTR, param1, param2, dataStore, param4);
-
-    // hooks again to catch the next incoming packets also
-    HookManager::WriteBlock(recvAddress, machineCodeHookRecv);
-
-    if (!recvHookGood)
-    {
-        printf("Recv hook WOD is working.\n");
-        recvHookGood = true;
-    }
-
-    return returnValue;
-}
-
-#pragma endregion

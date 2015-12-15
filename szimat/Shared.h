@@ -34,6 +34,12 @@ typedef struct {
 } CDataStore;
 
 typedef struct {
+    LPVOID send;
+    LPVOID recv;
+    char* name;
+} ProtoEntry;
+
+typedef struct {
     WORD build;
     WORD expansion;
 } VerInfo;
