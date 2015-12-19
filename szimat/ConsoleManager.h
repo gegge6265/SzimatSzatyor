@@ -16,6 +16,7 @@
 */
 
 #pragma once
+static volatile bool _sniffingLoopCondition = false;
 
 // manages the console
 // console should be accessed, created and destroyed through this class
@@ -23,7 +24,7 @@ class ConsoleManager
 {
 public:
     // creates the console
-    static bool Create(volatile bool* sniffingLoopCondition)
+    static bool Create()
     {
         // basically creates the console
         if (!AllocConsole())
@@ -48,13 +49,15 @@ public:
 
         // "sniffing loop" is only looping when this boolean is true
         // so just set this to false to stop it
-        _sniffingLoopCondition = sniffingLoopCondition;
+        _sniffingLoopCondition = true;
 
         return true;
     }
 
     // destroys the console
     static void Destroy() { FreeConsole(); }
+
+    static bool IsRuning() { return _sniffingLoopCondition; }
 
     // this method will be called when a CTRL-C event occures
     // should stop the sniffing loop, so the sniffer will be stopped
@@ -63,12 +66,7 @@ public:
         // SIGINT
         printf("\nQuiting...\n");
         // stops the sniffing loop
-        *_sniffingLoopCondition = true;
+        _sniffingLoopCondition = false;
         return TRUE;
     }
-
-private:
-    // pointer to a boolean which is true when sniffing is still in progress
-    // and false when sniffing should stop
-    static volatile bool* _sniffingLoopCondition;
 };

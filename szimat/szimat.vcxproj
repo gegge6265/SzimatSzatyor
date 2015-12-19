@@ -69,15 +69,21 @@
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <LinkIncremental>true</LinkIncremental>
+    <TargetName>$(ProjectName).$(PlatformTarget)</TargetName>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <LinkIncremental>true</LinkIncremental>
+    <TargetName>$(ProjectName).$(PlatformTarget)</TargetName>
+    <OutDir>$(SolutionDir)$(Configuration)\</OutDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <LinkIncremental>false</LinkIncremental>
+    <TargetName>$(ProjectName).$(PlatformTarget)</TargetName>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <LinkIncremental>false</LinkIncremental>
+    <TargetName>$(ProjectName).$(PlatformTarget)</TargetName>
+    <OutDir>$(SolutionDir)$(Configuration)\</OutDir>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
@@ -94,7 +100,7 @@
       <AdditionalDependencies>$(SolutionDir)lib\$(Configuration)\libMinHook.$(PlatformTarget).lib;Shlwapi.lib;Version.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <PostBuildEvent>
-      <Command>copy $(SolutionDir)szimat\offsets.ini $(OutDir)
+      <Command>copy $(SolutionDir)szimat\offsets.$(PlatformTarget).ini $(OutDir)
 copy $(SolutionDir)README $(OutDir)</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
@@ -114,7 +120,7 @@ copy $(SolutionDir)README $(OutDir)</Command>
       <AdditionalDependencies>$(SolutionDir)lib\$(Configuration)\libMinHook.$(PlatformTarget).lib;Shlwapi.lib;Version.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <PostBuildEvent>
-      <Command>copy $(SolutionDir)szimat\offsets.ini $(OutDir)
+      <Command>copy $(SolutionDir)szimat\offsets.$(PlatformTarget).ini $(OutDir)
 copy $(SolutionDir)README $(OutDir)</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
@@ -137,7 +143,7 @@ copy $(SolutionDir)README $(OutDir)</Command>
       <AdditionalDependencies>$(SolutionDir)lib\$(Configuration)\libMinHook.$(PlatformTarget).lib;Shlwapi.lib;Version.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <PostBuildEvent>
-      <Command>copy $(SolutionDir)szimat\offsets.ini $(OutDir)
+      <Command>copy $(SolutionDir)szimat\offsets.$(PlatformTarget).ini $(OutDir)
 copy $(SolutionDir)README $(OutDir)</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
@@ -161,7 +167,7 @@ copy $(SolutionDir)README $(OutDir)</Command>
       <AdditionalDependencies>$(SolutionDir)lib\$(Configuration)\libMinHook.$(PlatformTarget).lib;Shlwapi.lib;Version.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <PostBuildEvent>
-      <Command>copy $(SolutionDir)szimat\offsets.ini $(OutDir)
+      <Command>copy $(SolutionDir)szimat\offsets.$(PlatformTarget).ini $(OutDir)
 copy $(SolutionDir)README $(OutDir)</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
@@ -173,7 +179,8 @@ copy $(SolutionDir)README $(OutDir)</Command>
     <ClInclude Include="Shared.h" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="offsets.ini" />
+    <None Include="offsets.x64.ini" />
+    <None Include="offsets.x86.ini" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

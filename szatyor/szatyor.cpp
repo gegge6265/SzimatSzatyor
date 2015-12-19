@@ -20,20 +20,19 @@
 #include <Aclapi.h>
 #include <cstdio>
 #include <list>
+#include <map>
 #include "..\szimat\Shared.h"
 
-// default name of the process which will be hooked
-const char* lookingProcessName = "Wow.exe";
-// this DLL will be injected
-const char* injectDLLName = "szimat.dll";
-
-// list container which stores PIDs
-typedef std::list<DWORD /* PID */> PIDList;
-// typedef for constant iterator of PIDList
-typedef PIDList::const_iterator PIDList_ConstItr;
+#if _WIN64
+char* lookingProcessName[] = { "Wow-64.exe", "WowT-64.exe", "WowB-64.exe" };
+char* injectDLLName = "szimat.x64.dll";
+#else
+char* lookingProcessName[] = { "Wow.exe", "WowT.exe", "WowB.exe" };
+char* injectDLLName = "szimat.x86.dll";
+#endif
 
 // gets PIDs of the processes which found by name
-PIDList GetProcessIDsByName(const char* /* processName */);
+std::map<DWORD, PCHAR> GetProcessList();
 // returns true if the specific process already injeted with the specific DLL
 bool IsProcessAlreadyInjected(DWORD /* PID */, const char* /* moduleName */);
 // opens client's process targeted by PID
@@ -61,7 +60,7 @@ int main(int argc, char* argv[])
     }
     // custom process' name
     else if (argc > 1)
-        lookingProcessName = argv[1];
+        lookingProcessName[0] = argv[1];
     else if (argc > 2)
         injectDLLName = argv[2];
 
@@ -69,19 +68,17 @@ int main(int argc, char* argv[])
     DWORD processID = 0;
 
     // tries to get the PIDs
-    PIDList& pids = GetProcessIDsByName(lookingProcessName);
+    std::map<DWORD, PCHAR> &pids = GetProcessList();
     if (pids.empty())
     {
         printf("'%s' process NOT found.\n", lookingProcessName);
-        printf("Note: be sure the process which you looking for ");
-        printf("is must be a 32 bit process.\n\n");
         system("pause");
         return 0;
     }
     // just one PID found
     else if (pids.size() == 1)
     {
-        processID = pids.front();
+        processID = pids.begin()->first;
         printf("'%s' process found, PID: %u\n", lookingProcessName, processID);
         // checks this process is already injected or not
         if (IsProcessAlreadyInjected(processID, injectDLLName))
@@ -99,17 +96,18 @@ int main(int argc, char* argv[])
 
         // stores the PIDs which are already injected
         // so these are "invalid"
-        PIDList injectedPIDs;
+        std::list<DWORD> injectedPIDs;
 
         unsigned int idx = 1;
-        for (PIDList_ConstItr itr = pids.begin(); itr != pids.end(); ++itr)
+        //for (PIDList_ConstItr itr = pids.begin(); itr != pids.end(); ++itr)
+        for (auto itr : pids)
         {
-            DWORD pid = *itr;
-            printf("[%u] PID: %u\n", idx++, pid);
-            if (IsProcessAlreadyInjected(pid, injectDLLName))
+            //DWORD pid = *itr;
+            printf("[%u] PID: %u (%s)\n", idx++, itr.first, itr.second);
+            if (IsProcessAlreadyInjected(itr.first, injectDLLName))
             {
                 printf("Already injected!\n\n");
-                injectedPIDs.push_back(pid);
+                injectedPIDs.push_back(itr.first);
             }
         }
 
@@ -144,9 +142,9 @@ int main(int argc, char* argv[])
             }
 
             // gets PID via index
-            PIDList_ConstItr itr = pids.begin();
+            auto itr = pids.begin();
             std::advance(itr, selectedIndex - 1);
-            processID = *itr;
+            processID = itr->first;
 
             // if already injected
             if (std::find(injectedPIDs.begin(), injectedPIDs.end(), processID) != injectedPIDs.end())
@@ -203,16 +201,16 @@ int main(int argc, char* argv[])
     return 0;
 }
 
-PIDList GetProcessIDsByName(const char* processName)
+std::map<DWORD, PCHAR> GetProcessList()
 {
     // list of correct PIDs
-    PIDList pids;
+    std::map<DWORD, char*> pids;
 
     // gets a snapshot from 32 bit processes
     HANDLE hSnapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
     if (hSnapshot == INVALID_HANDLE_VALUE)
     {
-        printf("ERROR: Can't get snapshot from 32 bit processes, ");
+        printf("ERROR: Can't get snapshot from processes, ");
         printf("ErrorCode: %u\n", GetLastError());
         return pids;
     }
@@ -229,8 +227,11 @@ PIDList GetProcessIDsByName(const char* processName)
         do
         {
             // process found
-            if (!strcmp(processEntry.szExeFile, lookingProcessName))
-                pids.push_back(processEntry.th32ProcessID);
+            for (auto pname : lookingProcessName)
+            {
+                if (!strcmp(processEntry.szExeFile, pname))
+                    pids.insert(std::pair<DWORD, PCHAR>(processEntry.th32ProcessID, pname));
+            }
         }
         // loops over the snapshot
         while (Process32Next(hSnapshot, &processEntry));
@@ -403,20 +404,25 @@ bool InjectDLL(DWORD processID, const char* dllLocation)
     }
     printf("\nProcess [%u] '%s' is opened.\n", processID, lookingProcessName);
 
-    // gets the build number
-    auto verInfo = GetVerInfoFromProcess(hProcess);
+    WowInfo wowInfo;
+    if (!GetWowInfo(hProcess, NULL, &wowInfo))
+    {
+        printf("Can't determine build number.\n\n");
+        CloseHandle(hProcess);
+        return false;
+    }
+
     // error occured
-    if (!verInfo.build)
+    if (!wowInfo.build)
     {
         printf("Can't determine build number.\n");
         CloseHandle(hProcess);
         return false;
     }
-    printf("Detected build number: %hu\n", verInfo.build);
 
-    // checks this build is supported or not
-    HookEntry hookEntry;
-    if (!GetOffsets(NULL, verInfo.build, &hookEntry))
+    printf("Detected build %u, expansion %u\n", wowInfo.build, wowInfo.expansion);
+
+    if (wowInfo.IsEmpty())
     {
         printf("ERROR: This build number is not supported.\n");
         CloseHandle(hProcess);

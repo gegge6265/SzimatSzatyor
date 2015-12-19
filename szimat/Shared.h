@@ -22,7 +22,12 @@
 #include <cstdio>
 #include <io.h>
 
-#define WOW_MOP_16135 16135
+#define CMSG 0x47534D43 // client to server, CMSG
+#define SMSG 0x47534D53 // server to client, SMSG
+
+const WORD pkt_version    = 0x0301;
+const BYTE sniffer_id     = 15;
+const BYTE sessionKey[40] = { NULL };
 
 typedef struct {
     void* vTable;
@@ -40,23 +45,31 @@ typedef struct {
 } ProtoEntry;
 
 typedef struct {
-    WORD build;
-    WORD expansion;
-} VerInfo;
+    LPVOID sendDetour;
+    LPVOID recvDetour;
+    bool sendHookGood = false;
+    bool recvHookGood = false;
+
+    char locale[5] = { "xxXX" };
+} HookInfo;
 
 // hook entry structure
 // stores the offsets which are will be hooked
 // every different client version should has different offsets
 typedef struct {
+    // client build
+    WORD build;
+    // client expansion
+    WORD expansion;
     // offset of NetClient::Send2 to sniff client packets
     DWORD send;
     // offset of NetClient::ProcessMessage to sniff server packets
     DWORD recv;
     // offset of client locale "xxXX"
     DWORD lang;
-    //
+
     bool IsEmpty() { return send == NULL || recv == NULL; }
-} HookEntry;
+} WowInfo;
 
 // returns the build number of the client
 // returns 0 if an error occurred
@@ -70,7 +83,7 @@ typedef struct {
 // param should NOT be NULL when would like to get the
 // path of an _external_ process' executable
 // so in the injector the param should contain the handle of a WoW process
-VerInfo GetVerInfoFromProcess(HANDLE hProcess = NULL)
+bool GetVerInfoFromProcess(HANDLE hProcess, WORD* build, WORD* expansion)
 {
     // will contain where the process is which will be injected
     char processExePath[MAX_PATH];
@@ -83,7 +96,7 @@ VerInfo GetVerInfoFromProcess(HANDLE hProcess = NULL)
     if (!processExePathSize)
     {
         printf("ERROR: Can't get path of the process' exe, ErrorCode: %u\n", GetLastError());
-        return{ NULL, NULL };
+        return false;
     }
     printf("ExePath: %s\n", processExePath);
 
@@ -93,7 +106,7 @@ VerInfo GetVerInfoFromProcess(HANDLE hProcess = NULL)
     {
         printf("ERROR: Can't get size of the file version info,");
         printf("ErrorCode: %u\n", GetLastError());
-        return{ NULL, NULL };
+        return false;
     }
 
     // allocates memory for file version info
@@ -103,7 +116,7 @@ VerInfo GetVerInfoFromProcess(HANDLE hProcess = NULL)
     {
         printf("ERROR: Can't get file version info, ErrorCode: %u\n", GetLastError());
         delete[] fileVersionInfoBuffer;
-        return{ NULL, NULL };
+        return false;
     }
 
     // structure of file version info
@@ -116,18 +129,18 @@ VerInfo GetVerInfoFromProcess(HANDLE hProcess = NULL)
     {
         printf("ERROR: File version info query is failed.\n");
         delete[] fileVersionInfoBuffer;
-        return{ NULL, NULL };
+        return false;
     }
 
-    WORD build = fileInfo->dwFileVersionLS & 0xFFFF;
-    WORD expansion = (fileInfo->dwFileVersionMS >> 16) & 0xFFFF;
+    *build     = (WORD)( fileInfo->dwFileVersionLS & 0xFFFF);
+    *expansion = (WORD)((fileInfo->dwFileVersionMS >> 16) & 0xFFFF);
 
     delete[] fileVersionInfoBuffer;
-    return{ build, expansion };
+    return true;
 }
 
 // return the HookEntry from current build
-bool GetOffsets(const HINSTANCE moduleHandle, const WORD build, HookEntry* entry)
+bool GetWowInfo(const HANDLE hProcess, const HINSTANCE moduleHandle, WowInfo* entry)
 {
     char fileName[MAX_PATH];
     char dllPath[MAX_PATH];
@@ -137,8 +150,18 @@ bool GetOffsets(const HINSTANCE moduleHandle, const WORD build, HookEntry* entry
     // removes the DLL name from the path
     PathRemoveFileSpec(dllPath);
 
-    _snprintf(fileName, MAX_PATH, "%s\\offsets.ini", dllPath);
-    _snprintf(section, 6, "%i", build);
+    if (!GetVerInfoFromProcess(hProcess, &entry->build, &entry->expansion))
+    {
+        printf("ERROR: Can't get wow version info!\n\n");
+        return false;
+    }
+
+#if _WIN64
+    _snprintf(fileName, MAX_PATH, "%s\\offsets.x64.ini", dllPath);
+#else
+    _snprintf(fileName, MAX_PATH, "%s\\offsets.x86.ini", dllPath);
+#endif
+    _snprintf(section, 6, "%i", entry->build);
 
     if (_access(fileName, 0) == -1)
     {
