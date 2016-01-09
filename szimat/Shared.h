@@ -28,6 +28,7 @@
 const WORD pkt_version    = 0x0301;
 const BYTE sniffer_id     = 15;
 const BYTE sessionKey[40] = { NULL };
+const DWORD optionalHeaderLength = 0;
 
 typedef struct {
     void* vTable;

@@ -16,15 +16,13 @@ HookInfo hookInfo;
 
 char dllPath[MAX_PATH] = { NULL };
 
-void DumpPacket(DWORD packetType, DWORD connectionId, WORD opcodeSize, CDataStore* dataStore)
+void DumpPacket(DWORD packetType, DWORD connectionId, DWORD opcode, BYTE opcodeSize, DWORD size, BYTE* buffer)
 {
     mtx.lock();
     // gets the time
     time_t rawTime;
     time(&rawTime);
-
     DWORD tickCount = GetTickCount();
-    DWORD optionalHeaderLength = 0;
 
     if (!fileDump)
     {
@@ -55,7 +53,8 @@ void DumpPacket(DWORD packetType, DWORD connectionId, WORD opcodeSize, CDataStor
         fwrite("PKT",                           3, 1, fileDump);  // magic
         fwrite((WORD*)&pkt_version,             2, 1, fileDump);  // major.minor version
         fwrite((BYTE*)&sniffer_id,              1, 1, fileDump);  // sniffer id
-        fwrite((DWORD*)&wowInfo.build,          4, 1, fileDump);  // client build
+        fwrite((WORD*)&wowInfo.build,           2, 1, fileDump);  // client build
+        fwrite(sessionKey,                      1, 2, fileDump);  // client build (aligned bytes)
         fwrite(hookInfo.locale,                 4, 1, fileDump);  // client lang
         fwrite(sessionKey,                     40, 1, fileDump);  // session key
         fwrite((DWORD*)&rawTime,                4, 1, fileDump);  // started time
@@ -64,24 +63,17 @@ void DumpPacket(DWORD packetType, DWORD connectionId, WORD opcodeSize, CDataStor
         fflush(fileDump);
     }
 
-    DWORD packetOpcode = opcodeSize == 4
-        ? *(DWORD*)dataStore->buffer
-        : *(WORD*)dataStore->buffer;
-
-    BYTE* packetData     = dataStore->buffer + opcodeSize;
-    DWORD packetDataSize = dataStore->size   - opcodeSize;
-
     fwrite((DWORD*)&packetType,             4, 1, fileDump);  // direction of the packet
     fwrite((DWORD*)&connectionId,           4, 1, fileDump);  // connection id
     fwrite((DWORD*)&tickCount,              4, 1, fileDump);  // timestamp of the packet
-    fwrite((DWORD*)&optionalHeaderLength,   4, 1, fileDump);  // connection id
-    fwrite((DWORD*)&dataStore->size,        4, 1, fileDump);  // size of the packet + opcode lenght
-    fwrite((DWORD*)&packetOpcode,           4, 1, fileDump);  // opcode
+    fwrite((DWORD*)&optionalHeaderLength,   4, 1, fileDump);  // optional data size
+    fwrite((DWORD*)&size,                   4, 1, fileDump);  // size of the packet + opcode lenght
+    fwrite((DWORD*)&opcode,                 4, 1, fileDump);  // opcode
 
-    fwrite(packetData, packetDataSize,         1, fileDump);  // data
+    fwrite(buffer + opcodeSize, size - opcodeSize, 1, fileDump);  // data
 
 #if _DEBUG
-    printf("%s Opcode: 0x%04X Size: %-8u\n", packetType == CMSG ? "CMSG" : "SMSG", packetOpcode, packetDataSize);
+    printf("%s Opcode: 0x%04X Size: %-8u\n", packetType == CMSG ? "CMSG" : "SMSG", opcode, size);
 #endif
 
     fflush(fileDump);
@@ -93,25 +85,19 @@ void DumpPacket(DWORD packetType, DWORD connectionId, WORD opcodeSize, CDataStor
 
 #if _WIN64
 
-typedef DWORD(__fastcall *SendProto)(void*, void*, void*);
-DWORD __fastcall SendHook(void* thisPTR, CDataStore* dataStore, DWORD connectionId)
+void __fastcall SendHook(LPVOID thisPTR, CDataStore* ds, DWORD connectionId)
 {
-    DumpPacket(CMSG, connectionId, 4, dataStore);
+    DumpPacket(CMSG, connectionId, *(DWORD*)ds->buffer, 4, ds->size, ds->buffer);
     CHECK(hookInfo.sendHookGood, "Send hook is working.\n");
-    return reinterpret_cast<SendProto>(hookInfo.sendDetour)(thisPTR, dataStore, (LPVOID)connectionId);
+    reinterpret_cast<decltype(&SendHook)>(hookInfo.sendDetour)(thisPTR, ds, connectionId);
 }
 
-#pragma region RecvHook
-
-typedef DWORD(__fastcall *RecvProto_WOD)(void*, void*, void*, void*, void*);
-DWORD __fastcall RecvHook_WOD(void* thisPTR, void* param1, void* param2, CDataStore* dataStore, void* param4)
+DWORD_PTR __fastcall RecvHook_WOD(LPVOID a1, LPVOID a2, LPVOID a3, BYTE* buff, DWORD size)
 {
-    DumpPacket(SMSG, (DWORD)param4, 4, dataStore);
+    DumpPacket(SMSG, 0, *(DWORD*)buff, 4, size, buff);
     CHECK(hookInfo.recvHookGood, "Recv hook is working.\n");
-    return reinterpret_cast<RecvProto_WOD>(hookInfo.recvDetour)(thisPTR, param1, param2, dataStore, param4);
+    return reinterpret_cast<decltype(&RecvHook_WOD)>(hookInfo.recvDetour)(a1, a2, a3, buff, size);
 }
-
-#pragma endregion
 
 const ProtoEntry ProtoTable[] = {
     /* 0 */{ NULL     , NULL         , "Aplha"     },
@@ -126,59 +112,59 @@ const ProtoEntry ProtoTable[] = {
 
 #else
 
-typedef DWORD(__thiscall *SendProto)(void*, void*, void*);
-DWORD __fastcall SendHook(void* thisPTR, void* dummy, CDataStore* dataStore, DWORD connectionId)
+DWORD __fastcall SendHook(void* thisPTR, void* dummy, CDataStore* ds, DWORD connectionId)
 {
-    DumpPacket(CMSG, connectionId, 4, dataStore);
+    DumpPacket(CMSG, connectionId, *(DWORD*)ds->buffer, 4, ds->size, ds->buffer);
     CHECK(hookInfo.sendHookGood, "Send hook is working.\n");
-    return reinterpret_cast<SendProto>(hookInfo.sendDetour)(thisPTR, dataStore, (LPVOID)connectionId);
+    typedef DWORD(__thiscall *proto)(void*, void*, DWORD);
+    return reinterpret_cast<proto>(hookInfo.sendDetour)(thisPTR, ds, connectionId);
 }
 
 #pragma region RecvHook
 
-typedef DWORD(__thiscall *RecvProto)(void*, void*, void*);
-DWORD __fastcall RecvHook(void* thisPTR, void* dummy, void* param1, CDataStore* dataStore)
+DWORD __fastcall RecvHook(void* thisPTR, void* dummy, void* param1, CDataStore* ds)
 {
-    DumpPacket(SMSG, 0, 2, dataStore);
+    DumpPacket(SMSG, 0, *(WORD*)ds->buffer, 2, ds->size, ds->buffer);
     CHECK(hookInfo.recvHookGood, "Recv hook is working.\n");
-    return reinterpret_cast<RecvProto>(hookInfo.recvDetour)(thisPTR, param1, dataStore);
+    typedef DWORD(__thiscall *proto)(void*, void*, void*);
+    return reinterpret_cast<proto>(hookInfo.recvDetour)(thisPTR, param1, ds);
 }
 
-typedef DWORD(__thiscall *RecvProto_TBC)(void*, void*, void*, void*);
-DWORD __fastcall RecvHook_TBC(void* thisPTR, void* dummy, void* param1, CDataStore* dataStore, void* param3)
+DWORD __fastcall RecvHook_TBC(void* thisPTR, void* dummy, void* param1, CDataStore* ds, void* param3)
 {
-    DumpPacket(SMSG, (DWORD)param3, 2, dataStore);
+    DumpPacket(SMSG, 0, *(WORD*)ds->buffer, 2, ds->size, ds->buffer);
     CHECK(hookInfo.recvHookGood, "Recv hook is working.\n");
-    return reinterpret_cast<RecvProto_TBC>(hookInfo.recvDetour)(thisPTR, param1, dataStore, param3);
+    typedef DWORD(__thiscall *proto)(void*, void*, void*, void*);
+    return reinterpret_cast<proto>(hookInfo.recvDetour)(thisPTR, param1, ds, param3);
 }
 
-typedef DWORD(__thiscall *RecvProto_MOP)(void*, void*, void*, void*);
-DWORD __fastcall RecvHook_MOP(void* thisPTR, void* dummy, void* param1, CDataStore* dataStore, void* param3)
+DWORD __fastcall RecvHook_MOP(void* thisPTR, void* dummy, void* param1, CDataStore* ds, void* param3)
 {
-    DumpPacket(SMSG, (DWORD)param3, 4, dataStore);
+    DumpPacket(SMSG, 0, *(DWORD*)ds->buffer, 4, ds->size, ds->buffer);
     CHECK(hookInfo.recvHookGood, "Recv hook is working.\n");
-    return reinterpret_cast<RecvProto_MOP>(hookInfo.recvDetour)(thisPTR, param1, dataStore, param3);
+    typedef DWORD(__thiscall *proto)(void*, void*, void*, void*);
+    return reinterpret_cast<proto>(hookInfo.recvDetour)(thisPTR, param1, ds, param3);
 }
 
-typedef DWORD(__thiscall *RecvProto_WOD)(void*, void*, void*, void*, void*);
-DWORD __fastcall RecvHook_WOD(void* thisPTR, void* dummy, void* param1, void* param2, CDataStore* dataStore, void* param4)
+DWORD __fastcall RecvHook_WOD(void* thisPTR, void* dummy, void* param1, void* param2, CDataStore* ds, void* param4)
 {
-    DumpPacket(SMSG, (DWORD)param4, 4, dataStore);
+    DumpPacket(SMSG, 0, *(DWORD*)ds->buffer, 4, ds->size, ds->buffer);
     CHECK(hookInfo.recvHookGood, "Recv hook is working.\n");
-    return reinterpret_cast<RecvProto_WOD>(hookInfo.recvDetour)(thisPTR, param1, param2, dataStore, param4);
+    typedef DWORD(__thiscall *proto)(void*, void*, void*, void*, void*);
+    return reinterpret_cast<proto>(hookInfo.recvDetour)(thisPTR, param1, param2, ds, param4);
 }
 
 #pragma endregion
 
 const ProtoEntry ProtoTable[] = {
-    /* 0 */{ NULL     , NULL         , "Aplha" },
-    /* 1 */{ &SendHook, &RecvHook    , "Vanilla" },
-    /* 2 */{ &SendHook, &RecvHook_TBC, "TBC" },
-    /* 3 */{ &SendHook, &RecvHook_TBC, "WotLK" },
+    /* 0 */{ NULL     , NULL         , "Aplha"     },
+    /* 1 */{ &SendHook, &RecvHook    , "Vanilla"   },
+    /* 2 */{ &SendHook, &RecvHook_TBC, "TBC"       },
+    /* 3 */{ &SendHook, &RecvHook_TBC, "WotLK"     },
     /* 4 */{ &SendHook, &RecvHook_TBC, "Cataclysm" },
-    /* 5 */{ &SendHook, &RecvHook_MOP, "MOP" },
-    /* 6 */{ &SendHook, &RecvHook_WOD, "WOD" },
-    /* 7 */{ NULL     , NULL         , "Legion" },
+    /* 5 */{ &SendHook, &RecvHook_MOP, "MOP"       },
+    /* 6 */{ &SendHook, &RecvHook_WOD, "WOD"       },
+    /* 7 */{ NULL     , NULL         , "Legion"    },
 };
 
 #endif
@@ -216,7 +202,7 @@ DWORD MainThreadControl(LPVOID /* param */)
         FreeLibraryAndExitThread((HMODULE)instanceDLL, 0);
     }
 
-    if (wowInfo.expansion >= sizeof(ProtoTable))
+    if (wowInfo.expansion >= _countof(ProtoTable))
     {
         printf("\nERROR: Unsupported expansion (%u) ", wowInfo.expansion);
         system("pause");
@@ -234,13 +220,12 @@ DWORD MainThreadControl(LPVOID /* param */)
     }
 
     // get the base address of the current process
-    DWORD baseAddress = (DWORD)GetModuleHandle(NULL);
+    DWORD_PTR baseAddress = (DWORD_PTR)GetModuleHandle(NULL);
 
     // locale stored in reversed string (enGB as BGne...)
-    if (wowInfo.lang) {
-        DWORD localeAddress = wowInfo.lang;
-        for (int i = 3; i >= 0; --i)
-            hookInfo.locale[i] = *(char*)(baseAddress + localeAddress++);
+    if (wowInfo.lang)
+    {
+        *(DWORD*)hookInfo.locale = _byteswap_ulong(*(DWORD*)(baseAddress + wowInfo.lang));
         printf("Detected client locale: %s\n", hookInfo.locale);
     }
 
@@ -265,16 +250,19 @@ DWORD MainThreadControl(LPVOID /* param */)
 
     printf("Found '%s' hooks!\n", proto.name);
 
-    MH_CreateHook((LPVOID)(baseAddress + wowInfo.send), proto.send, &hookInfo.sendDetour);
-    MH_CreateHook((LPVOID)(baseAddress + wowInfo.recv), proto.recv, &hookInfo.recvDetour);
-    printf(">> %s hook is installed.\n", proto.name);
+    if (MH_CreateHook((LPVOID)(baseAddress + wowInfo.send), proto.send, &hookInfo.sendDetour) != MH_OK ||
+        MH_CreateHook((LPVOID)(baseAddress + wowInfo.recv), proto.recv, &hookInfo.recvDetour) != MH_OK ||
+        MH_EnableHook(MH_ALL_HOOKS) != MH_OK)
+    {
+        printf("\nERROR installing hooks (%u)\n", GetLastError());
+        system("pause");
+        FreeLibraryAndExitThread((HMODULE)instanceDLL, 0);
+    }
 
-    MH_EnableHook(MH_ALL_HOOKS);
+    printf(">> All '%s' hooks is installed.\n", proto.name);
 
-    // loops until SIGINT (CTRL-C) occurs
     while (ConsoleManager::IsRuning())
-        Sleep(50); // sleeps 50 ms to be nice
-
+        Sleep(50);
 
     MH_DisableHook(MH_ALL_HOOKS);
     printf("All hook disabled.\n");
